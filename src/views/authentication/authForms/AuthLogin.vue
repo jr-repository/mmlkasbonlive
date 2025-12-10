@@ -8,8 +8,8 @@ import { Form } from 'vee-validate';
 const checkbox = ref(false);
 const valid = ref(false);
 const show1 = ref(false);
-const password = ref('admin123');
-const username = ref('info@codedthemes.com');
+const password = ref('');
+const username = ref('');
 // Password validation rules
 const passwordRules = ref([
   (v: string) => !!v || 'Password is required',
@@ -42,7 +42,7 @@ function validate(values: any, { setErrors }: any) {
 <template>
   <div class="d-flex justify-space-between align-center">
     <h3 class="text-h3 text-center mb-0">Login</h3>
-    <router-link to="/register" class="text-primary text-decoration-none">Don't Have an account?</router-link>
+    <router-link to="/register" class="text-primary text-decoration-none"></router-link>
   </div>
   <Form @submit="validate" class="mt-7 loginForm" v-slot="{ errors, isSubmitting }">
     <div class="mb-6">
@@ -93,7 +93,7 @@ function validate(values: any, { setErrors }: any) {
         hide-details
       ></v-checkbox>
       <div class="ml-auto">
-        <router-link to="/login1" class="text-darkText link-hover">Forgot Password?</router-link>
+        <router-link to="/login1" class="text-darkText link-hover"></router-link>
       </div>
     </div>
     <v-btn color="primary" :loading="isSubmitting" block class="mt-5" variant="flat" size="large" :disabled="valid" type="submit">

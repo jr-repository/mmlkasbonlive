@@ -1,3 +1,4 @@
+// Lokasi: src/router/PublicRoutes.ts
 const PublicRoutes = {
   path: '/auth',
   component: () => import('@/layouts/blank/BlankLayout.vue'),
@@ -7,22 +8,17 @@ const PublicRoutes = {
   children: [
     {
       name: 'Authentication',
-      path: '/login',
-      component: () => import('@/views/authentication/LoginPage.vue')
-    },
-    {
-      name: 'Login',
-      path: '/login1',
-      component: () => import('@/views/authentication/auth/LoginPage.vue')
+      path: 'login', // UBAH DARI '/login' MENJADI 'login'
+      component: () => import('@/views/authentication/auth/LoginPage.vue') // Pastikan path komponen ini benar
     },
     {
       name: 'Register',
-      path: '/register',
+      path: 'register', // UBAH DARI '/register' MENJADI 'register'
       component: () => import('@/views/authentication/auth/RegisterPage.vue')
     },
     {
       name: 'Error 404',
-      path: '/error',
+      path: 'error', // UBAH DARI '/error' MENJADI 'error'
       component: () => import('@/views/pages/maintenance/error/Error404Page.vue')
     }
   ]

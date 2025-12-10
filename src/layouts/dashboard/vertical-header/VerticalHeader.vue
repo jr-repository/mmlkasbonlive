@@ -1,31 +1,47 @@
 <script setup lang="ts">
-import { useCustomizerStore } from '../../../stores/customizer';
-// icons
-import { MenuFoldOutlined, SearchOutlined, GithubOutlined } from '@ant-design/icons-vue';
-
-// dropdown imports
-import NotificationDD from './NotificationDD.vue';
-import Searchbar from './SearchBarPanel.vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useRoute } from 'vue-router';
+import { useCustomizerStore } from '@/stores/customizer';
+import { useAuthStore } from '@/stores/auth';
+import { Menu2Icon } from 'vue-tabler-icons'; // Pengganti MenuFoldOutlined
 import ProfileDD from './ProfileDD.vue';
 
 const customizer = useCustomizerStore();
+const authStore = useAuthStore();
+const route = useRoute();
+
+// --- LOGIKA DATA SAYA (Breadcrumb) ---
+const routeNames: Record<string, string> = {
+    'Dashboard': 'Dashboard',
+    'JobOrder': 'Job Order',
+    'Kasbon': 'Kasbon & Biaya',
+    'Invoice': 'Sales Invoice',
+    'Penerimaan': 'Penerimaan Lain',
+    'Transfer': 'Transfer Bank',
+    'Pelunasan': 'Pelunasan Piutang',
+    'Laporan': 'Laporan Keuangan',
+    'Users': 'Manajemen User',
+    'AccurateSettings': 'Konfigurasi Sistem'
+};
+const pageTitle = computed(() => routeNames[route.name as string] || 'Halaman');
+
+// --- LOGIKA DATA SAYA (Waktu Real-time) ---
+const currentTime = ref(new Date());
+let timer: any;
+onMounted(() => { timer = setInterval(() => currentTime.value = new Date(), 1000); });
+onUnmounted(() => { if (timer) clearInterval(timer); });
+
+const formattedDate = computed(() => currentTime.value.toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short", year: "numeric" }));
+const formattedTime = computed(() => currentTime.value.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }));
+
+// --- LOGIKA DATA SAYA (User) ---
+const user = computed(() => authStore.userData || { name: 'User', role: 'Staff' });
 </script>
 
 <template>
-  <v-app-bar elevation="0" height="60">
+  <v-app-bar elevation="0" height="60" class="bg-surface border-b">
     <v-btn
-      class="hidden-md-and-down text-secondary mr-3"
-      color="darkText"
-      icon
-      rounded="sm"
-      variant="text"
-      @click.stop="customizer.SET_MINI_SIDEBAR(!customizer.mini_sidebar)"
-      size="small"
-    >
-      <MenuFoldOutlined :style="{ fontSize: '16px' }" />
-    </v-btn>
-    <v-btn
-      class="hidden-lg-and-up text-secondary ms-3"
+      class="text-secondary mr-3 ml-2"
       color="darkText"
       icon
       rounded="sm"
@@ -33,84 +49,56 @@ const customizer = useCustomizerStore();
       @click.stop="customizer.SET_SIDEBAR_DRAWER"
       size="small"
     >
-      <MenuFoldOutlined :style="{ fontSize: '16px' }" />
+      <Menu2Icon size="20" />
     </v-btn>
 
-    <!-- search mobile -->
-    <v-menu :close-on-content-click="false" class="hidden-lg-and-up" offset="10, 0">
-      <template v-slot:activator="{ props }">
-        <v-btn
-          class="hidden-lg-and-up text-secondary ml-1"
-          color="lightsecondary"
-          icon
-          rounded="sm"
-          variant="flat"
-          size="small"
-          v-bind="props"
-        >
-          <SearchOutlined :style="{ fontSize: '17px' }" />
-        </v-btn>
-      </template>
-      <v-sheet class="search-sheet v-col-12 pa-0" width="320">
-        <v-text-field persistent-placeholder placeholder="Search here.." color="primary" variant="solo" hide-details>
-          <template v-slot:prepend-inner>
-            <SearchOutlined :style="{ fontSize: '17px' }" />
-          </template>
-        </v-text-field>
-      </v-sheet>
-    </v-menu>
-
-    <!-- ---------------------------------------------- -->
-    <!-- Search part -->
-    <!-- ---------------------------------------------- -->
-    <v-sheet class="d-none d-lg-block" width="250">
-      <Searchbar />
-    </v-sheet>
-
-    <!---/Search part -->
+    <div class="d-none d-lg-block ml-2">
+        <span class="text-caption text-grey-darken-1">App / </span>
+        <span class="text-subtitle-2 font-weight-bold text-grey-darken-2">{{ pageTitle }}</span>
+    </div>
 
     <v-spacer />
-    <!-- ---------------------------------------------- -->
-    <!---right part -->
-    <!-- ---------------------------------------------- -->
 
-    <!-- ---------------------------------------------- -->
-    <!-- Github -->
-    <!-- ---------------------------------------------- -->
-    <v-btn
-      icon
-      class="text-secondary hidden-sm-and-down d-flex"
-      color="darkText"
-      rounded="sm"
-      variant="text"
-      href="https://github.com/codedthemes/mantis-free-vuetify-vuejs-admin-template"
-      target="_blank"
-    >
-      <GithubOutlined :style="{ fontSize: '16px' }" />
-    </v-btn>
+           <div class="d-flex align-center bg-green-lighten-5 px-2 py-0 rounded-pill border">
+            <span class="position-relative d-flex h-2 w-2 mr-1">
+              <span class="position-absolute d-inline-flex h-100 w-100 rounded-circle bg-success opacity-75 animate-ping"></span>
+              <span class="position-relative d-inline-flex rounded-circle h-2 w-2 bg-success"></span>
+            </span>
+            <span class="text-[10px] font-weight-bold text-success">Online</span>
+          </div>
 
-    <!-- ---------------------------------------------- -->
-    <!-- Notification -->
-    <!-- ---------------------------------------------- -->
-    <NotificationDD />
+    <div class="d-none d-sm-flex flex-column align-end mr-4 text-right">
+        <div class="text-caption font-weight-bold">{{ formattedDate }}</div>
+        <div class="text-caption text-grey" style="font-size: 10px;">{{ formattedTime }}</div>
+    </div>
 
-    <!-- ---------------------------------------------- -->
-    <!-- User Profile -->
-    <!-- ---------------------------------------------- -->
-    <v-menu :close-on-content-click="false" offset="8, 0">
+    <v-menu :close-on-content-click="false" offset="8, 0" location="bottom end">
       <template v-slot:activator="{ props }">
         <v-btn class="profileBtn" variant="text" rounded="sm" v-bind="props">
           <div class="d-flex align-center">
-            <v-avatar class="mr-sm-2 mr-0 py-2">
-              <img src="@/assets/images/users/avatar-1.png" alt="Julia" />
+            <v-avatar class="mr-sm-2 mr-0" size="32" color="primary">
+               <span class="text-white font-weight-bold text-caption">
+                   {{ user.name ? user.name.charAt(0).toUpperCase() : 'U' }}
+               </span>
             </v-avatar>
-            <h6 class="text-subtitle-1 mb-0 d-sm-block d-none">JWT User</h6>
+            <h6 class="text-subtitle-2 mb-0 d-sm-block d-none font-weight-medium">{{ user.name }}</h6>
           </div>
         </v-btn>
       </template>
-      <v-sheet rounded="md" width="290">
+      
+      <v-sheet rounded="md" width="290" elevation="10">
         <ProfileDD />
       </v-sheet>
     </v-menu>
   </v-app-bar>
 </template>
+
+<style scoped>
+/* Animasi Ping untuk Status Online */
+@keyframes ping {
+    75%, 100% { transform: scale(2); opacity: 0; }
+}
+.animate-ping { animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
+.h-2 { height: 8px; }
+.w-2 { width: 8px; }
+</style>

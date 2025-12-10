@@ -11,13 +11,15 @@ export default defineConfig({
     vue({
       template: {
         compilerOptions: {
-          isCustomElement: (tag) => ['v-list-recognize-title'].includes(tag)
+          isCustomElement: tag => ['v-list-recognize-title'].includes(tag)
         }
       }
     }),
     vuetify({
       autoImport: true
     }),
+
+    // ❗ HANYA aktif saat build, bukan dev
     viteStaticCopy({
       targets: [
         {
@@ -26,24 +28,31 @@ export default defineConfig({
           rename: '404.html'
         }
       ],
-      watch: {}
+      // Disable during dev so it doesn't error
+      watch: process.env.NODE_ENV === 'production'
     })
   ],
-  base: '/Mantis-Vue/',
+
+  // ⬅️ FIX: gunakan root `/`
+  base: '/',
+
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      '@': path.resolve(__dirname, './src'),
       'vue-i18n': 'vue-i18n/dist/vue-i18n.esm-bundler.js'
     }
   },
+
   css: {
     preprocessorOptions: {
       scss: {}
     }
   },
+
   build: {
-    chunkSizeWarningLimit: 1024 * 1024 // Set the limit to 1 MB
+    chunkSizeWarningLimit: 1024 * 1024
   },
+
   optimizeDeps: {
     exclude: ['vuetify'],
     entries: ['./src/**/*.vue']

@@ -19,7 +19,7 @@ const footerLink = shallowRef([
       <v-col cols="6">
         <p class="text-caption mb-0">
           © All rights reserved <a href="/" class="text-primary">Privacy Policy</a>. Distributed by
-          <a href="https://themewagon.com" target="_blank" rel="noopener noreferrer" class="text-primary"> ThemeWagon </a>
+          <a href="https://ptmultimitralogistik.com" target="_blank" rel="noopener noreferrer" class="text-primary"> MML </a>
         </p>
       </v-col>
       <v-col class="text-right" cols="6">

@@ -1,136 +1,57 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-// icons
-import {
-  LogoutOutlined,
-  UserOutlined,
-  SettingOutlined,
-  QuestionCircleOutlined,
-  LockOutlined,
-  CommentOutlined,
-  UnorderedListOutlined,
-  EditOutlined,
-  ProfileOutlined,
-  WalletOutlined
-} from '@ant-design/icons-vue';
+import { computed } from 'vue';
 import { useAuthStore } from '@/stores/auth';
+import { LogoutIcon } from 'vue-tabler-icons';
 
-const tab = ref(null);
 const authStore = useAuthStore();
+// Ambil data user dari store (fallback ke default jika kosong)
+const user = computed(() => authStore.userData || { name: 'User', role: 'Staff' });
 </script>
 
 <template>
-  <!-- ---------------------------------------------- -->
-  <!-- profile DD -->
-  <!-- ---------------------------------------------- -->
-  <div>
-    <div class="d-flex align-center pa-5">
-      <v-avatar size="32" class="mr-2">
-        <img src="@/assets/images/users/avatar-1.png" width="32" alt="Julia" />
+  <div class="pa-4">
+    <div class="d-flex align-center">
+      <v-avatar size="48" class="mr-3 bg-primary text-white font-weight-bold">
+        {{ user.name ? user.name.charAt(0).toUpperCase() : 'U' }}
       </v-avatar>
       <div>
-        <h6 class="text-h6 mb-0">JWT User</h6>
-        <p class="text-caption mb-0">UI/UX Designer</p>
-      </div>
-      <div class="ml-auto">
-        <v-btn variant="text" color="primary" rounded="sm" icon size="large" @click="authStore.logout()">
-          <LogoutOutlined :style="{ fontSize: '20px' }" />
-        </v-btn>
+        <h6 class="text-subtitle-1 font-weight-bold mb-0">{{ user.name }}</h6>
+        <div class="d-flex align-center mt-1">
+          <span class="text-caption text-grey mr-2">{{ user.role }}</span>
+          
+
+        </div>
       </div>
     </div>
-    <v-tabs v-model="tab" color="primary" grow>
-      <v-tab value="111"> <UserOutlined class="v-icon--start" /> Profile </v-tab>
-      <v-tab value="222"> <SettingOutlined class="v-icon--start" /> Setting </v-tab>
-    </v-tabs>
-    <perfect-scrollbar style="height: calc(100vh - 300px); max-height: 240px">
-      <v-window v-model="tab">
-        <v-window-item value="111">
-          <v-list class="py-0" aria-label="profile list" aria-busy="true">
-            <v-list-item color="primary" rounded="0" value="Edit profile">
-              <template v-slot:prepend>
-                <EditOutlined :style="{ fontSize: '14px' }" class="mr-4" />
-              </template>
 
-              <v-list-item-title class="text-h6"> Edit Profile</v-list-item-title>
-            </v-list-item>
+    <v-divider class="my-4"></v-divider>
 
-            <v-list-item color="primary" rounded="0" value="View Profile">
-              <template v-slot:prepend>
-                <UserOutlined :style="{ fontSize: '14px' }" class="mr-4" />
-              </template>
-
-              <v-list-item-title class="text-h6"> View Profile</v-list-item-title>
-            </v-list-item>
-
-            <v-list-item color="primary" rounded="0" value="Social Profile">
-              <template v-slot:prepend>
-                <ProfileOutlined :style="{ fontSize: '14px' }" class="mr-4" />
-              </template>
-
-              <v-list-item-title class="text-h6"> Social Profile</v-list-item-title>
-            </v-list-item>
-
-            <v-list-item color="primary" rounded="0" value="Billing">
-              <template v-slot:prepend>
-                <WalletOutlined :style="{ fontSize: '14px' }" class="mr-4" />
-              </template>
-
-              <v-list-item-title class="text-h6"> Billing</v-list-item-title>
-            </v-list-item>
-
-            <v-list-item @click="authStore.logout()" color="secondary" rounded="0">
-              <template v-slot:prepend>
-                <LogoutOutlined :style="{ fontSize: '14px' }" class="mr-4" />
-              </template>
-
-              <v-list-item-title class="text-subtitle-2"> Logout</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </v-window-item>
-        <v-window-item value="222">
-          <v-list class="py-0" aria-label="profile list" aria-busy="true">
-            <v-list-item color="primary" rounded="0" value="Support">
-              <template v-slot:prepend>
-                <QuestionCircleOutlined :style="{ fontSize: '14px' }" class="mr-4" />
-              </template>
-
-              <v-list-item-title class="text-h6"> Support</v-list-item-title>
-            </v-list-item>
-
-            <v-list-item color="primary" rounded="0" value="Account">
-              <template v-slot:prepend>
-                <UserOutlined :style="{ fontSize: '14px' }" class="mr-4" />
-              </template>
-
-              <v-list-item-title class="text-h6"> Account settings</v-list-item-title>
-            </v-list-item>
-
-            <v-list-item color="primary" rounded="0" value="Privacy">
-              <template v-slot:prepend>
-                <LockOutlined :style="{ fontSize: '14px' }" class="mr-4" />
-              </template>
-
-              <v-list-item-title class="text-h6"> Privacy center</v-list-item-title>
-            </v-list-item>
-
-            <v-list-item color="primary" rounded="0" value="Feedback">
-              <template v-slot:prepend>
-                <CommentOutlined :style="{ fontSize: '14px' }" class="mr-4" />
-              </template>
-
-              <v-list-item-title class="text-h6"> Feedback</v-list-item-title>
-            </v-list-item>
-
-            <v-list-item color="primary" rounded="0" value="History">
-              <template v-slot:prepend>
-                <UnorderedListOutlined :style="{ fontSize: '14px' }" class="mr-4" />
-              </template>
-
-              <v-list-item-title class="text-h6"> History</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </v-window-item>
-      </v-window>
-    </perfect-scrollbar>
+    <v-btn 
+      color="error" 
+      variant="outlined" 
+      block 
+      rounded="md"
+      @click="authStore.logout()" 
+      class="text-capitalize"
+    >
+      <LogoutIcon size="18" class="mr-2" />
+      Logout
+    </v-btn>
   </div>
 </template>
+
+<style scoped>
+/* Animasi Ping untuk Status Online */
+@keyframes ping {
+    75%, 100% {
+        transform: scale(2);
+        opacity: 0;
+    }
+}
+.animate-ping {
+    animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.h-2 { height: 8px; }
+.w-2 { width: 8px; }
+.text-[10px] { font-size: 10px; }
+</style>
