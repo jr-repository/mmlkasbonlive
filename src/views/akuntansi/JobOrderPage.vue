@@ -1,23 +1,19 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, watch } from 'vue';
+import { ref, reactive, onMounted, watch } from 'vue';
 import { format } from 'date-fns';
-import UiParentCard from '@/components/shared/UiParentCard.vue';
 import AsyncSelect from '@/components/common/AsyncSelect.vue';
 
 // Icons
 import { 
     PlusIcon, 
-    FilterIcon, 
-    SearchIcon, 
-    EyeIcon, 
     TrashIcon, 
+    EyeIcon, 
     DeviceFloppyIcon,
     RefreshIcon,
     FileDescriptionIcon,
     XIcon,
-    ClipboardTextIcon,
     CalendarEventIcon,
-    BriefcaseIcon
+    UserIcon // Icon PIC
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://multimitralogistik.id/Api";
@@ -26,16 +22,14 @@ const API_BASE_URL = "https://multimitralogistik.id/Api";
 const search = ref('');
 const loadingList = ref(false);
 const jobOrderList = ref<any[]>([]);
-const page = ref(1);
-const itemsPerPage = ref(10);
 
 const headers = [
     { title: 'No', key: 'index', align: 'center' as const, sortable: false },
     { title: 'JO Number', key: 'number', align: 'start' as const },
     { title: 'Date', key: 'transDate', align: 'start' as const },
     { title: 'Customer', key: 'customerName', align: 'start' as const },
+    { title: 'PIC', key: 'pic', align: 'start' as const }, // KOLOM BARU
     { title: 'Description', key: 'description', align: 'start' as const },
-    { title: 'Value', key: 'amount', align: 'end' as const },
     { title: 'Status', key: 'status', align: 'center' as const },
     { title: 'Actions', key: 'actions', align: 'center' as const, sortable: false },
 ];
@@ -45,6 +39,8 @@ const form = reactive({
     transDate: format(new Date(), 'yyyy-MM-dd'),
     jobNumber: '',
     customerNo: '',
+    customerName: '', // Simpan nama untuk DB lokal
+    pic: '', // FIELD BARU
     description: '',
     items: [{ id: Date.now(), no: '', name: '', quantity: 1 }]
 });
@@ -55,12 +51,10 @@ const dialogDetail = ref(false);
 const detailData = ref<any>(null);
 const loadingDetail = ref(false);
 
-// --- STATE SNACKBAR (TOAST) ---
+// --- STATE SNACKBAR ---
 const snackbar = reactive({ show: false, text: '', color: 'success' });
 const showMsg = (text: string, color = 'success') => {
-    snackbar.text = text;
-    snackbar.color = color;
-    snackbar.show = true;
+    snackbar.text = text; snackbar.color = color; snackbar.show = true;
 };
 
 // --- METHODS LIST ---
@@ -75,7 +69,7 @@ const fetchList = async () => {
         if (json.s && Array.isArray(json.d)) {
             jobOrderList.value = json.d.map((item: any, index: number) => ({
                 ...item,
-                index: index + 1 // Helper untuk nomor urut
+                index: index + 1
             }));
         } else {
             jobOrderList.value = [];
@@ -87,7 +81,6 @@ const fetchList = async () => {
     }
 };
 
-// Debounce search
 let searchTimeout: any;
 watch(search, () => {
     clearTimeout(searchTimeout);
@@ -109,25 +102,41 @@ const onItemChange = (index: number, obj: any) => {
     }
 };
 
+const onCustomerChange = (obj: any) => {
+    if(obj) {
+        form.customerName = obj.name;
+        form.customerNo = obj.customerNo;
+    }
+};
+
 const resetForm = () => {
     form.transDate = format(new Date(), 'yyyy-MM-dd');
     form.jobNumber = '';
     form.customerNo = '';
+    form.customerName = '';
+    form.pic = '';
     form.description = '';
     form.items = [{ id: Date.now(), no: '', name: '', quantity: 1 }];
 };
 
 const handleSubmit = async () => {
     if (!form.jobNumber || !form.customerNo) return showMsg('Lengkapi data Customer & Nomor JO', 'error');
+    if (!form.pic) return showMsg('PIC Pelaksana wajib diisi', 'error'); // Validasi PIC
     
     saving.value = true;
     try {
         const payload = {
-            transDate: format(new Date(form.transDate), 'dd/MM/yyyy'),
+            transDate: form.transDate, // Kirim format Y-m-d biar backend proses
             customerNo: form.customerNo,
+            customerName: form.customerName,
+            pic: form.pic,
             number: form.jobNumber,
             description: form.description,
-            detailItem: form.items.map(i => ({ itemNo: i.no, quantity: i.quantity }))
+            detailItem: form.items.map(i => ({ 
+                itemNo: i.no, 
+                itemName: i.name, // Kirim nama item untuk DB lokal
+                quantity: i.quantity 
+            }))
         };
 
         const res = await fetch(`${API_BASE_URL}/JobOrder/Transaksi.php`, {
@@ -143,7 +152,7 @@ const handleSubmit = async () => {
             fetchList();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
-            showMsg(json.d ? (Array.isArray(json.d) ? json.d.join(', ') : json.d) : 'Gagal simpan', 'error');
+            showMsg(json.d ? (Array.isArray(json.d) ? json.d.join(', ') : json.d?.message || 'Gagal') : 'Gagal simpan', 'error');
         }
     } catch (e) {
         showMsg('Terjadi kesalahan koneksi', 'error');
@@ -152,7 +161,6 @@ const handleSubmit = async () => {
     }
 };
 
-// --- METHODS DETAIL ---
 const openDetail = async (id: number) => {
     dialogDetail.value = true;
     loadingDetail.value = true;
@@ -178,7 +186,6 @@ onMounted(() => {
     <v-card elevation="10" rounded="lg" class="mb-6 overflow-hidden">
         <div class="bg-gradient-smooth px-6 py-8">
             <div class="d-flex align-center gap-3">
-              
                 <div>
                     <h2 class="text-h4 font-weight-bold text-white mb-1" style="text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                         Job Order Management
@@ -222,15 +229,30 @@ onMounted(() => {
                                     v-model="form.customerNo"
                                     item-title="name"
                                     item-value="customerNo"
+                                    @change="onCustomerChange"
                                 />
                             </div>
+
+                            <v-text-field 
+                                v-model="form.pic" 
+                                label="PIC Pelaksana Order" 
+                                placeholder="Nama Penanggung Jawab"
+                                variant="outlined"
+                                color="primary"
+                                density="comfortable"
+                                class="mb-2"
+                            >
+                                <template v-slot:prepend-inner>
+                                    <UserIcon size="20" class="text-grey" />
+                                </template>
+                            </v-text-field>
 
                             <v-textarea 
                                 v-model="form.description" 
                                 label="Project Description / Notes" 
                                 variant="outlined"
                                 color="primary"
-                                rows="3"
+                                rows="2"
                                 auto-grow
                                 placeholder="Enter details about this job order..."
                             ></v-textarea>
@@ -324,23 +346,8 @@ onMounted(() => {
                 <v-divider></v-divider>
 
                 <v-card-actions class="bg-grey-lighten-5 px-6 py-4 justify-end">
-                    <v-btn 
-                        variant="outlined" 
-                        color="secondary" 
-                        size="large"
-                        @click="resetForm"
-                        class="px-6"
-                    >
-                        Cancel
-                    </v-btn>
-                    <v-btn 
-                        color="primary" 
-                        size="large"
-                        variant="flat"
-                        @click="handleSubmit" 
-                        :loading="saving"
-                        class="px-6 ml-2"
-                    >
+                    <v-btn variant="outlined" color="secondary" size="large" @click="resetForm" class="px-6">Cancel</v-btn>
+                    <v-btn color="primary" size="large" variant="flat" @click="handleSubmit" :loading="saving" class="px-6 ml-2">
                         <DeviceFloppyIcon size="20" class="mr-2" /> Save Job Order
                     </v-btn>
                 </v-card-actions>
@@ -354,7 +361,7 @@ onMounted(() => {
                         <FileDescriptionIcon size="24" class="text-white mr-2" />
                         <div>
                             <h3 class="text-h6 font-weight-bold text-white">Transaction History</h3>
-                            <div class="text-caption text-white opacity-80">Data list from server</div>
+                            <div class="text-caption text-white opacity-80">Local Database Records</div>
                         </div>
                     </div>
                     
@@ -371,14 +378,7 @@ onMounted(() => {
                             style="min-width: 250px;"
                             class="rounded"
                         ></v-text-field>
-                        <v-btn 
-                            icon 
-                            variant="text" 
-                            color="white" 
-                            @click="fetchList" 
-                            :loading="loadingList"
-                            title="Refresh Data"
-                        >
+                        <v-btn icon variant="text" color="white" @click="fetchList" :loading="loadingList" title="Refresh">
                             <RefreshIcon size="20"/>
                         </v-btn>
                     </div>
@@ -394,7 +394,7 @@ onMounted(() => {
                 >
                     <template v-slot:headers="{ columns, isSorted, getSortIcon, toggleSort }">
                         <tr class="bg-gradient-smooth">
-                            <template v-for="column in columns" :key="column.key">
+                          <template v-for="column in columns" :key="column.key ?? column.title">
                                 <th class="text-subtitle-2 font-weight-bold text-uppercase text-white py-3 border-none">
                                     {{ column.title }}
                                 </th>
@@ -406,10 +406,11 @@ onMounted(() => {
                         <span class="font-weight-bold text-primary">{{ item.number }}</span>
                     </template>
 
-                    <template v-slot:item.amount="{ item }">
-                        <span class="font-weight-medium font-mono text-high-emphasis">
-                            {{ item.amount ? `Rp ${Number(item.amount).toLocaleString('id-ID')}` : '-' }}
-                        </span>
+                    <template v-slot:item.pic="{ item }">
+                        <div class="d-flex align-center">
+                            <UserIcon size="16" class="mr-2 text-grey"/>
+                            <span class="font-weight-medium">{{ item.pic || '-' }}</span>
+                        </div>
                     </template>
                     
                     <template v-slot:item.status="{ item }">
@@ -417,21 +418,14 @@ onMounted(() => {
                             size="small" 
                             variant="tonal"
                             class="font-weight-bold"
-                            :color="item.status === 'In Process' ? 'blue' : item.status === 'Closed' ? 'green' : 'grey'"
+                            :color="item.status === 'Submitted' ? 'green' : 'grey'"
                         >
                             {{ item.status }}
                         </v-chip>
                     </template>
                     
                     <template v-slot:item.actions="{ item }">
-                        <v-btn 
-                            icon 
-                            variant="text" 
-                            color="primary" 
-                            size="small" 
-                            @click="openDetail(item.id)"
-                            v-tooltip:top="'View Detail'"
-                        >
+                        <v-btn icon variant="text" color="primary" size="small" @click="openDetail(item.id)">
                             <EyeIcon size="20" />
                         </v-btn>
                     </template>
@@ -471,20 +465,14 @@ onMounted(() => {
                                 <div class="d-flex align-center gap-2 mb-2">
                                     <span class="text-h5 font-weight-bold text-primary">{{ detailData.number }}</span>
                                 </div>
-                                
                                 <div class="d-flex align-center gap-2 mb-2 text-grey-darken-1">
                                     <CalendarEventIcon size="18" />
                                     <span class="text-body-1">{{ detailData.transDate }}</span>
                                 </div>
-                                
-                                <v-chip 
-                                    size="small" 
-                                    variant="tonal"
-                                    class="mt-1 font-weight-bold"
-                                    :color="detailData.status === 'In Process' ? 'blue' : 'green'"
-                                >
-                                    {{ detailData.status }}
-                                </v-chip>
+                                <div class="d-flex align-center gap-2 text-grey-darken-2 mt-2">
+                                    <UserIcon size="18" />
+                                    <span class="font-weight-bold">PIC: {{ detailData.pic || '-' }}</span>
+                                </div>
                             </v-col>
 
                             <v-col cols="12" sm="6" class="text-sm-right">
@@ -493,7 +481,6 @@ onMounted(() => {
                                 <div class="text-body-2 text-primary font-mono bg-blue-lighten-5 d-inline-block px-3 py-1 rounded mb-3">
                                     {{ detailData.customer?.customerNo }}
                                 </div>
-                                
                                 <div class="text-caption text-grey-darken-1 mt-2 text-left text-sm-right bg-grey-lighten-4 pa-2 rounded border">
                                     <span class="font-weight-bold">Note:</span> "{{ detailData.description || 'No description provided' }}"
                                 </div>
@@ -506,7 +493,6 @@ onMounted(() => {
                             <v-icon start color="primary" size="small">mdi-package-variant-closed</v-icon>
                             Items Breakdown
                         </div>
-                        
                         <v-card variant="outlined" class="border rounded-lg overflow-hidden bg-white">
                             <v-table density="comfortable">
                                 <thead class="bg-grey-lighten-4">
@@ -514,7 +500,6 @@ onMounted(() => {
                                         <th width="50" class="text-center">#</th>
                                         <th>Item Description</th>
                                         <th class="text-center">Qty</th>
-                                        <th>Unit</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -529,7 +514,6 @@ onMounted(() => {
                                                 {{ item.quantity }}
                                             </v-chip>
                                         </td>
-                                        <td class="text-caption text-uppercase">{{ item.itemUnit?.name || 'PCS' }}</td>
                                     </tr>
                                 </tbody>
                             </v-table>
@@ -537,18 +521,9 @@ onMounted(() => {
                     </div>
                 </div>
             </v-card-text>
-
             <v-divider></v-divider>
-            
             <v-card-actions class="bg-white pa-4 justify-end">
-                <v-btn 
-                    variant="outlined" 
-                    color="primary" 
-                    @click="dialogDetail = false"
-                    class="px-6"
-                >
-                    Close Detail
-                </v-btn>
+                <v-btn variant="outlined" color="primary" @click="dialogDetail = false" class="px-6">Close Detail</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -565,19 +540,12 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* CLASS UTAMA UNTUK GRADIENT SMOOTH */
 .bg-gradient-smooth {
-    /* Gradient Biru Tua ke Putih/Biru Sangat Muda (Smooth) */
     background: linear-gradient(135deg, #1565C0 0%, #42A5F5 60%, #BBDEFB 100%);
-    /* Opsi alternatif jika ingin lebih putih di ujung: */
-    /* background: linear-gradient(90deg, #1565C0 0%, #E3F2FD 100%); */
 }
-
-/* Memastikan teks pada table header yang menggunakan gradient tetap terbaca */
 :deep(th) {
     background-color: transparent !important;
 }
-
 .font-mono {
     font-family: 'Roboto Mono', monospace;
 }

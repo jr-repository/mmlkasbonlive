@@ -1,5 +1,3 @@
-// Lokasi: src/router/MainRoutes.ts
-
 const MainRoutes = {
     path: '/main',
     meta: {
@@ -38,10 +36,9 @@ const MainRoutes = {
             path: '/transfer',
             component: () => import('@/views/akuntansi/TransferPage.vue')
         },
-        // UPDATE FINAL BATCH 4
         {
             name: 'Pelunasan',
-            path: '/pelunasan', // Perlu menambahkan ini ke Sidebar jika belum ada
+            path: '/pelunasan',
             component: () => import('@/views/akuntansi/PelunasanPage.vue')
         },
         {
@@ -53,6 +50,11 @@ const MainRoutes = {
             name: 'Users',
             path: '/users',
             component: () => import('@/views/akuntansi/UserSettingPage.vue')
+        },
+        {
+            name: 'ApproverSettings', // ROUTE BARU
+            path: '/approver-settings',
+            component: () => import('@/views/akuntansi/ApproverSettingPage.vue')
         },
         {
             name: 'AccurateSettings',
@@ -68,7 +70,17 @@ const MainRoutes = {
             name: 'RekonSettings',
             path: '/rekon/settings',
             component: () => import('@/views/rekon/RekonSettingsPage.vue')
-        }
+        },
+        {
+            name: 'MasterTax',
+            path: '/master/tax',
+            component: () => import('@/views/akuntansi/MasterTaxPage.vue')
+        },
+        {
+            name: 'Bill',
+            path: '/bill',
+            component: () => import('@/views/akuntansi/BillPage.vue')
+        },
     ]
 };
 

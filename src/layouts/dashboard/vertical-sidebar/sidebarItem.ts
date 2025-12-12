@@ -1,4 +1,3 @@
-// Lokasi: src/layouts/dashboard/vertical-sidebar/sidebarItem.ts
 import {
     LayoutDashboardIcon,
     ClipboardListIcon,
@@ -8,7 +7,8 @@ import {
     ArrowsLeftRightIcon,
     ChartBarIcon,
     UsersIcon,
-    SettingsIcon
+    SettingsIcon,
+    ShieldCheckIcon // Icon Baru
 } from 'vue-tabler-icons';
 
 export interface menu {
@@ -76,10 +76,26 @@ const sidebarItem: menu[] = [
         to: '/users'
     },
     {
+        title: 'Setting Approver', // MENU BARU
+        icon: ShieldCheckIcon,
+        to: '/approver-settings'
+    },
+    {
         title: 'Konfigurasi Sistem',
         icon: SettingsIcon,
         to: '/settings'
-    }
+    },
+    { header: 'Master Data' },
+    {
+        title: 'Setting Pajak',
+        icon: SettingsIcon,
+        to: '/master/tax'
+    },
+    {
+        title: 'Tagihan Vendor (AP)',
+        icon: FileInvoiceIcon,
+        to: '/bill'
+    },
 ];
 
 export default sidebarItem;

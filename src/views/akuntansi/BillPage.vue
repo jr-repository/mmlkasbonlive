@@ -1,49 +1,40 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, watch } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { format } from 'date-fns';
 import { useAuthStore } from '@/stores/auth';
 import UiParentCard from '@/components/shared/UiParentCard.vue';
 import AsyncSelect from '@/components/common/AsyncSelect.vue';
 import { 
     PlusIcon, TrashIcon, EyeIcon, DeviceFloppyIcon, XIcon, WalletIcon,
-    CheckIcon, BanIcon, PencilIcon 
+    CheckIcon, BanIcon, PencilIcon, FileInvoiceIcon
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://multimitralogistik.id/Api";
 const authStore = useAuthStore();
 
-// --- STATE ---
 const loadingList = ref(false);
-const invoiceList = ref<any[]>([]);
+const billList = ref<any[]>([]);
 const search = ref('');
 const taxList = ref<any[]>([]); 
 
-// --- FORM STATE ---
 const form = reactive({
     id: 0, 
     transDate: format(new Date(), 'yyyy-MM-dd'),
-    customerNo: '',
-    customerName: '',
+    vendorNo: '',
+    vendorName: '',
     description: '',
     globalDiscPercent: 0,
     downPayment: 0,
     items: [
         { 
-            id: Date.now(), 
-            itemNo: '', 
-            itemName: '', 
-            quantity: 1, 
-            unitPrice: 0, 
-            itemDiscPercent: '', 
-            ppnRate: 0, 
-            pphRate: 0
+            id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', 
+            ppnRate: 0, pphRate: 0 
         }
     ]
 });
 const saving = ref(false);
 const isEditing = ref(false);
 
-// --- DETAIL STATE ---
 const dialogDetail = ref(false);
 const detailData = ref<any>(null);
 const approving = ref(false);
@@ -54,9 +45,8 @@ const showMsg = (text: string, color = 'success') => {
     snackbar.text = text; snackbar.color = color; snackbar.show = true;
 };
 
-// --- COMPUTED ---
 const canApprove = computed(() => {
-    return authStore.userData?.approvals?.includes('INVOICE') || authStore.userData?.role === 'admin';
+    return authStore.userData?.approvals?.includes('BILL') || authStore.userData?.role === 'admin';
 });
 
 const ppnOptions = computed(() => [{name:'Non PPN', rate:0}, ...taxList.value.filter(x => x.type === 'PPN')]);
@@ -101,7 +91,6 @@ const totalPPh = computed(() => {
 const grandTotal = computed(() => taxableAmount.value + totalPPN.value);
 const netBalance = computed(() => grandTotal.value - form.downPayment);
 
-// --- METHODS ---
 const fetchTaxes = async () => {
     try {
         const res = await fetch(`${API_BASE_URL}/MasterData/Tax/List.php`);
@@ -118,11 +107,11 @@ const getDefaultTax = (type: string) => {
 const fetchList = async () => {
     loadingList.value = true;
     try {
-        const url = new URL(`${API_BASE_URL}/Invoice/List.php`);
+        const url = new URL(`${API_BASE_URL}/Bill/List.php`);
         if(search.value) url.searchParams.append('q', search.value);
         const res = await fetch(url.toString());
         const json = await res.json();
-        if(json.s) invoiceList.value = json.d.map((x:any, i:number) => ({...x, index: i+1}));
+        if(json.s) billList.value = json.d.map((x:any, i:number) => ({...x, index: i+1}));
     } finally { loadingList.value = false; }
 };
 
@@ -137,10 +126,10 @@ const removeItem = (idx: number) => {
     if(form.items.length > 1) form.items.splice(idx, 1);
 };
 
-const onCustChange = (obj: any) => {
+const onVendorChange = (obj: any) => {
     if(obj) {
-        form.customerNo = obj.customerNo;
-        form.customerName = obj.name;
+        form.vendorNo = obj.vendorNo;
+        form.vendorName = obj.name;
     }
 };
 
@@ -154,8 +143,8 @@ const onItemChange = (idx: number, obj: any) => {
 
 const resetForm = () => {
     form.id = 0;
-    form.customerNo = ''; 
-    form.customerName = '';
+    form.vendorNo = ''; 
+    form.vendorName = '';
     form.description = '';
     form.items = [{ id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', ppnRate: getDefaultTax('PPN'), pphRate: getDefaultTax('PPH') }];
     form.downPayment = 0; 
@@ -164,14 +153,14 @@ const resetForm = () => {
 };
 
 const handleEdit = async (item: any) => {
-    const res = await fetch(`${API_BASE_URL}/Invoice/Detail.php?id=${item.id}`);
+    const res = await fetch(`${API_BASE_URL}/Bill/Detail.php?id=${item.id}`);
     const json = await res.json();
     if(json.s) {
         const d = json.d;
         form.id = d.id;
         form.transDate = d.transDate; 
-        form.customerNo = d.customer.customerNo;
-        form.customerName = d.customer.name;
+        form.vendorNo = d.vendor.vendorNo;
+        form.vendorName = d.vendor.name;
         form.description = d.description;
         form.globalDiscPercent = d.globalDiscPercent;
         form.downPayment = d.downPayment;
@@ -183,8 +172,8 @@ const handleEdit = async (item: any) => {
             quantity: x.quantity,
             unitPrice: x.unitPrice,
             itemDiscPercent: x.itemDiscPercent,
-            ppnRate: x.ppnRate || (x.useTax1 ? 11 : 0),
-            pphRate: x.pphRate || (x.useTax3 ? 2 : 0)
+            ppnRate: x.ppnRate,
+            pphRate: x.pphRate
         }));
         
         isEditing.value = true;
@@ -193,10 +182,10 @@ const handleEdit = async (item: any) => {
 };
 
 const handleSubmit = async () => {
-    if(!form.customerNo) return showMsg("Pilih Customer", "error");
+    if(!form.vendorNo) return showMsg("Pilih Vendor", "error");
     saving.value = true;
     try {
-        const res = await fetch(`${API_BASE_URL}/Invoice/Transaksi.php`, {
+        const res = await fetch(`${API_BASE_URL}/Bill/Transaksi.php`, {
             method: 'POST', body: JSON.stringify(form)
         });
         const json = await res.json();
@@ -212,10 +201,10 @@ const handleSubmit = async () => {
 };
 
 const handleApprove = async (id: number) => {
-    if(!confirm("Yakin Approve?")) return;
+    if(!confirm("Yakin Approve? Data akan dikirim ke Accurate.")) return;
     approving.value = true;
     try {
-        const res = await fetch(`${API_BASE_URL}/Invoice/Approve.php`, {
+        const res = await fetch(`${API_BASE_URL}/Bill/Approve.php`, {
             method: 'POST', body: JSON.stringify({ id, user_id: authStore.userData?.id })
         });
         const json = await res.json();
@@ -234,7 +223,7 @@ const handleReject = async (id: number) => {
     if(!confirm("Yakin Reject?")) return;
     rejecting.value = true;
     try {
-        const res = await fetch(`${API_BASE_URL}/Invoice/Reject.php`, {
+        const res = await fetch(`${API_BASE_URL}/Bill/Reject.php`, {
             method: 'POST', body: JSON.stringify({ id, user_id: authStore.userData?.id })
         });
         const json = await res.json();
@@ -252,7 +241,7 @@ const handleReject = async (id: number) => {
 const openDetail = async (id: number) => {
     dialogDetail.value = true;
     detailData.value = null;
-    const res = await fetch(`${API_BASE_URL}/Invoice/Detail.php?id=${id}`);
+    const res = await fetch(`${API_BASE_URL}/Bill/Detail.php?id=${id}`);
     const json = await res.json();
     if(json.s) detailData.value = json.d;
 };
@@ -271,7 +260,7 @@ onMounted(() => {
 <template>
     <v-row>
         <v-col cols="12">
-            <UiParentCard :title="isEditing ? 'Edit Invoice' : 'Input Sales Invoice'">
+            <UiParentCard :title="isEditing ? 'Edit Tagihan (AP)' : 'Input Tagihan Vendor (AP)'">
                 <template v-slot:action v-if="isEditing">
                     <v-btn color="error" variant="text" @click="resetForm">Batal Edit</v-btn>
                 </template>
@@ -281,12 +270,12 @@ onMounted(() => {
                         <v-text-field type="date" label="Tanggal" v-model="form.transDate" variant="outlined" density="compact"></v-text-field>
                         
                         <AsyncSelect 
-                            label="Customer" 
-                            :apiEndpoint="`${API_BASE_URL}/Invoice/MasterCustomer.php`" 
+                            label="Vendor" 
+                            :apiEndpoint="`${API_BASE_URL}/Bill/MasterVendor.php`" 
                             item-title="name" 
-                            item-value="customerNo"
-                            v-model="form.customerNo"
-                            @change="onCustChange"
+                            item-value="vendorNo"
+                            v-model="form.vendorNo"
+                            @change="onVendorChange"
                         />
                         <v-textarea label="Keterangan" v-model="form.description" rows="2" variant="outlined" class="mt-3"></v-textarea>
                     </v-col>
@@ -298,7 +287,7 @@ onMounted(() => {
                                     <tr>
                                         <th width="250">Item</th>
                                         <th width="70">Qty</th>
-                                        <th width="120">Harga</th>
+                                        <th width="120">Harga Beli</th>
                                         <th width="80">Disc</th>
                                         <th width="100">PPN</th>
                                         <th width="100">PPh</th>
@@ -309,7 +298,7 @@ onMounted(() => {
                                     <tr v-for="(item, i) in form.items" :key="item.id">
                                         <td class="py-2">
                                             <AsyncSelect 
-                                                :apiEndpoint="`${API_BASE_URL}/Invoice/MasterItem.php`"
+                                                :apiEndpoint="`${API_BASE_URL}/Bill/MasterItem.php`"
                                                 item-title="name" item-value="no"
                                                 v-model="item.itemNo"
                                                 label="Item..."
@@ -374,7 +363,7 @@ onMounted(() => {
                                     </div>
                                 </v-card>
                                 <v-btn block color="primary" size="large" class="mt-4" @click="handleSubmit" :loading="saving">
-                                    <DeviceFloppyIcon size="20" class="mr-2"/> {{ isEditing ? 'Simpan Perubahan' : 'Simpan Invoice' }}
+                                    <DeviceFloppyIcon size="20" class="mr-2"/> {{ isEditing ? 'Simpan Perubahan' : 'Simpan Tagihan' }}
                                 </v-btn>
                             </v-col>
                         </v-row>
@@ -384,15 +373,15 @@ onMounted(() => {
         </v-col>
         
         <v-col cols="12">
-            <UiParentCard title="Riwayat Invoice">
+            <UiParentCard title="Riwayat Tagihan Vendor">
                 <v-data-table :headers="[
                     { title: 'No', key: 'index' },
-                    { title: 'Invoice #', key: 'number' },
-                    { title: 'Customer', key: 'customerName' },
+                    { title: 'Bill #', key: 'number' },
+                    { title: 'Vendor', key: 'vendorName' },
                     { title: 'Total', key: 'totalAmount', align:'end' },
                     { title: 'Status', key: 'status', align:'center' },
                     { title: 'Action', key: 'actions', align:'center' }
-                ]" :items="invoiceList" :loading="loadingList" density="compact">
+                ]" :items="billList" :loading="loadingList" density="compact">
                     <template v-slot:item.totalAmount="{ item }">Rp {{ Number(item.totalAmount).toLocaleString('id-ID') }}</template>
                     <template v-slot:item.status="{ item }">
                         <v-chip size="small" :color="item.status === 'SUBMITTED' ? 'green' : (item.status === 'REJECTED' ? 'red' : 'orange')">
@@ -414,15 +403,15 @@ onMounted(() => {
     <v-dialog v-model="dialogDetail" max-width="800">
         <v-card v-if="detailData">
             <v-card-title class="bg-primary text-white d-flex justify-space-between align-center">
-                <span>Invoice #{{ detailData.number }}</span>
+                <span>Bill #{{ detailData.number }}</span>
                 <v-btn icon variant="text" color="white" @click="dialogDetail = false"><XIcon/></v-btn>
             </v-card-title>
             <v-card-text class="pt-4">
                 <v-row>
                     <v-col cols="6">
-                        <strong>Customer:</strong> {{ detailData.customer.name }}<br>
+                        <strong>Vendor:</strong> {{ detailData.vendor.name }}<br>
                         <strong>Date:</strong> {{ detailData.transDate }}<br>
-                        <strong>Status:</strong> <v-chip size="x-small" :color="detailData.status==='REJECTED'?'red':'blue'">{{ detailData.status || 'UNKNOWN' }}</v-chip>
+                        <strong>Status:</strong> <v-chip size="x-small" :color="detailData.status==='REJECTED'?'red':'blue'">{{ detailData.status }}</v-chip>
                     </v-col>
                 </v-row>
                 <v-table density="compact" class="mt-4 border">
