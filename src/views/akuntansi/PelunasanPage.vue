@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue';
+// FIX: Tambahkan onBeforeUnmount
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'; 
 import { format } from 'date-fns';
 import UiParentCard from '@/components/shared/UiParentCard.vue';
 import AsyncSelect from '@/components/common/AsyncSelect.vue';
@@ -12,7 +13,7 @@ import {
     RefreshIcon
 } from 'vue-tabler-icons';
 
-const API_BASE_URL = "https://multimitralogistik.id/Api";
+const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
 
 // --- STATE ---
 const form = reactive({
@@ -30,13 +31,20 @@ const loadingInv = ref(false);
 const saving = ref(false);
 const snackbar = reactive({ show: false, text: '', color: 'success' });
 
+// FIX: Pindahkan deklarasi timer
+let timeout: ReturnType<typeof setTimeout> | null = null;
+
 // --- COMPUTED ---
 const totalOutstanding = computed(() => invoices.value.reduce((sum, inv) => sum + (Number(inv.outstanding) || 0), 0));
 const totalBayar = computed(() => invoices.value.reduce((sum, inv) => sum + (Number(inv.payAmount) || 0), 0));
 
 // --- METHODS ---
 const fetchInvoices = async () => {
-    if (!form.customerNo) return;
+    if (!form.customerNo) {
+        invoices.value = [];
+        loadingInv.value = false;
+        return;
+    }
     loadingInv.value = true;
     try {
         let url = `${API_BASE_URL}/Pelunasan/MasterInvoice.php?customerNo=${form.customerNo}`;
@@ -50,21 +58,27 @@ const fetchInvoices = async () => {
         } else {
             invoices.value = [];
         }
-    } catch { invoices.value = []; } 
+    } catch { 
+        invoices.value = []; 
+        showMsg("Gagal memuat daftar faktur.", "error"); // FIX: Tambah notifikasi error
+    } 
     finally { loadingInv.value = false; }
 };
 
+// FIX: Fungsi Debounce untuk search/filter
+const fetchInvoicesDebounced = () => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(fetchInvoices, 500); // FIX: Debounce 500ms
+}
+
 // Debounce Search Invoice
-let timeout: any;
-watch(searchInv, () => {
-    clearTimeout(timeout);
-    timeout = setTimeout(fetchInvoices, 500);
-});
+watch(searchInv, fetchInvoicesDebounced); // FIX: Gunakan fungsi debounced
 
 // Watch Customer Change
+// FIX: Panggil fetchInvoices Debounced saat customerNo berubah untuk menghindari double call dan potensi race condition
 watch(() => form.customerNo, () => {
     invoices.value = [];
-    fetchInvoices();
+    fetchInvoicesDebounced(); // FIX: Gunakan fungsi debounced
 });
 
 const handlePayAll = (id: number) => {
@@ -98,13 +112,25 @@ const handleSubmit = async () => {
             showMsg(`Sukses! Bukti: ${json.d?.r?.number || json.r?.number}`);
             invoices.value = []; // Clear list
             form.description = '';
-            // Opsional: Reset customer agar flow mulai dari awal atau biarkan untuk input lagi
+            // Opsional: fetchInvoices ulang jika ingin menampilkan invoice baru yang mungkin masih outstanding
+            fetchInvoicesDebounced();
         } else {
-            showMsg(Array.isArray(json.d) ? json.d.join(", ") : JSON.stringify(json.d), 'error');
+            // FIX: Penanganan error dari backend yang mungkin kompleks
+            const errorMessage = Array.isArray(json.d) ? json.d.join(", ") : (json.message || JSON.stringify(json.d));
+            showMsg(errorMessage, 'error');
         }
-    } catch (e: any) { showMsg(e.message, 'error'); } 
+    } catch (e: any) { 
+        showMsg(e.message || "Terjadi kesalahan koneksi", 'error'); 
+    } 
     finally { saving.value = false; }
 };
+
+// FIX: Bersihkan timer saat komponen dilepas
+onBeforeUnmount(() => {
+    if (timeout) clearTimeout(timeout);
+});
+
+// Tidak ada onMounted(fetchInvoices) karena fetch harus menunggu customerNo dipilih.
 </script>
 
 <template>
@@ -147,23 +173,28 @@ const handleSubmit = async () => {
                         />
                     </v-col>
                     <v-col cols="12" md="6">
-                         <v-text-field v-model="form.transDate" type="date" label="Payment Date" variant="outlined" density="compact"></v-text-field>
-                         <v-textarea v-model="form.description" label="Notes / Reference" rows="2" variant="outlined" class="mt-2"></v-textarea>
+                           <v-text-field v-model="form.transDate" type="date" label="Payment Date" variant="outlined" density="compact"></v-text-field>
+                           <v-textarea v-model="form.description" label="Notes / Reference" rows="2" variant="outlined" class="mt-2"></v-textarea>
                     </v-col>
                 </v-row>
 
                 <div class="mt-4">
                     <div class="d-flex justify-space-between align-center mb-2">
                         <div class="text-subtitle-2">Outstanding Invoices</div>
-                        <div style="width: 250px">
-                             <v-text-field 
-                                v-model="searchInv" 
-                                density="compact" 
-                                variant="outlined" 
-                                placeholder="Search Invoice No..." 
-                                prepend-inner-icon="mdi-magnify" 
-                                hide-details
-                            ></v-text-field>
+                        <div class="d-flex align-center gap-2">
+                             <div style="width: 250px">
+                                  <v-text-field 
+                                        v-model="searchInv" 
+                                        density="compact" 
+                                        variant="outlined" 
+                                        placeholder="Search Invoice No..." 
+                                        prepend-inner-icon="mdi-magnify" 
+                                        hide-details
+                                  ></v-text-field>
+                             </div>
+                             <v-btn icon variant="text" size="small" color="primary" @click="fetchInvoices" title="Refresh Invoices" :loading="loadingInv">
+                                 <RefreshIcon size="20"/>
+                             </v-btn>
                         </div>
                     </div>
                     

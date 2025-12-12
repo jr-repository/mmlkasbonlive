@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue';
+// FIX: Tambahkan onBeforeUnmount
+import { ref, reactive, onMounted, watch, onBeforeUnmount } from 'vue'; 
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import UiParentCard from '@/components/shared/UiParentCard.vue';
@@ -17,7 +18,7 @@ import {
     PlusIcon // [BARU] Icon Plus
 } from 'vue-tabler-icons';
 
-const API_BASE_URL = "https://multimitralogistik.id/Api";
+const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
 const router = useRouter();
 const authStore = useAuthStore();
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -29,6 +30,9 @@ const stats = ref<any>(null);
 const search = ref("");
 const filterStatus = ref("ALL");
 const importing = ref(false);
+
+// FIX: Pindahkan deklarasi timer ke lingkup script setup
+let timeout: ReturnType<typeof setTimeout> | null = null; 
 
 // Modal Action State (Existing)
 const modalOpen = ref(false);
@@ -76,23 +80,29 @@ const fetchData = async () => {
         const resList = await fetch(`${API_BASE_URL}/Rekon/List.php?q=${search.value}&status=${filterStatus.value}`);
         const jsonList = await resList.json();
         if(jsonList.s) list.value = jsonList.d;
+        else list.value = []; // FIX: Pastikan list direset jika gagal
 
         // Fetch Dashboard Stats
         const resStats = await fetch(`${API_BASE_URL}/Rekon/Dashboard.php`);
         const jsonStats = await resStats.json();
         if(jsonStats.s) stats.value = jsonStats.d;
+        else stats.value = null; // FIX: Pastikan stats direset jika gagal
     } catch (e) {
+        showMsg("Gagal memuat data rekonsiliasi.", "error"); // FIX: Tambahkan notifikasi error
         console.error(e);
     } finally {
         loading.value = false;
     }
 };
 
-let timeout: any;
-watch([search, filterStatus], () => {
-    clearTimeout(timeout);
-    timeout = setTimeout(fetchData, 500);
-});
+// FIX: Gunakan fungsi debounced untuk watch
+const fetchDataDebounced = () => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(fetchData, 500); // FIX: Debounce 500ms
+}
+
+// FIX: Gunakan fungsi debounced untuk watch
+watch([search, filterStatus], fetchDataDebounced);
 
 // Import Logic
 const handleImportClick = () => fileInput.value?.click();
@@ -112,12 +122,13 @@ const handleFileChange = async (e: Event) => {
             showMsg(json.message, "success");
             fetchData();
         } else {
-            showMsg(json.message, "error");
+            showMsg(json.message || "Gagal melakukan import.", "error");
         }
     } catch {
-        showMsg("Gagal upload file.", "error");
+        showMsg("Gagal upload file. Periksa koneksi atau format file.", "error");
     } finally {
         importing.value = false;
+        // FIX: Pastikan input file direset agar bisa memilih file yang sama lagi
         if(fileInput.value) fileInput.value.value = "";
     }
 };
@@ -164,7 +175,7 @@ const handleCreateSubmit = async () => {
             showMsg(json.message || "Gagal menyimpan", "error");
         }
     } catch(e) {
-        showMsg("Terjadi kesalahan koneksi", "error");
+        showMsg("Terjadi kesalahan koneksi saat menyimpan manual.", "error");
     } finally {
         creating.value = false;
     }
@@ -175,6 +186,7 @@ const openModal = (item: any) => {
     selectedItem.value = item;
     actionForm.status = item.status;
     actionForm.note = item.note || "";
+    // FIX: Pastikan uploadFiles direset di sini untuk menghindari pengiriman file lama yang tidak diinginkan
     uploadFiles.value = [];
     modalOpen.value = true;
 };
@@ -190,6 +202,7 @@ const handleActionSubmit = async () => {
     formData.append("user", authStore.userData?.name || "System");
     formData.append("user_id", String(authStore.userData?.id || 0));
 
+    // FIX: Pastikan file di-append dengan benar
     uploadFiles.value.forEach((file) => formData.append("files[]", file));
 
     try {
@@ -200,10 +213,10 @@ const handleActionSubmit = async () => {
             modalOpen.value = false;
             fetchData();
         } else {
-            showMsg(json.message, "error");
+            showMsg(json.message || "Gagal memperbarui status.", "error");
         }
     } catch {
-        showMsg("Terjadi kesalahan koneksi.", "error");
+        showMsg("Terjadi kesalahan koneksi saat update status.", "error");
     } finally {
         submitting.value = false;
     }
@@ -212,6 +225,11 @@ const handleActionSubmit = async () => {
 const fmtMoney = (val: number) => val ? val.toLocaleString('id-ID') : '-';
 
 onMounted(fetchData);
+
+// FIX: Bersihkan timer saat komponen dilepas
+onBeforeUnmount(() => {
+    if (timeout) clearTimeout(timeout);
+});
 </script>
 
 <template>
@@ -499,3 +517,9 @@ onMounted(fetchData);
         <template v-slot:actions><v-btn variant="text" @click="snackbar.show = false">Tutup</v-btn></template>
     </v-snackbar>
 </template>
+
+<style scoped>
+.font-mono { font-family: 'Roboto Mono', monospace; }
+.border-blue { border-left: 4px solid #42a5f5; }
+.border-green { border-left: 4px solid #66bb6a; }
+</style>

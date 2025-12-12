@@ -18,16 +18,18 @@ const sidebarMenu = shallowRef(sidebarItems);
 const menuKeyMap: Record<string, string> = {
     'Dashboard': 'dashboard',
     'Job Order': 'job_order',
+    'Sales Invoice (AR)': 'invoice', // Updated Title
+    'Tagihan Vendor (AP)': 'bill',   // New Menu
     'Kasbon & Biaya': 'kasbon',
-    'Sales Invoice': 'invoice',
     'Penerimaan Lain': 'penerimaan',
     'Transfer Bank': 'transfer',
     'Laporan': 'laporan',
     'Rekonsiliasi Bank': 'rekon',
+    'Setting Pajak': 'master_tax',   // New Menu
     'Manajemen User': 'users',
+    'Setting Approver': 'approver_settings', // New Menu
     'Konfigurasi Sistem': 'settings'
 };
-
 // Filter Menu Logic
 const filteredMenu = computed(() => {
     // Jika Admin, tampilkan semua

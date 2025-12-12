@@ -28,26 +28,35 @@ export interface menu {
 }
 
 const sidebarItem: menu[] = [
-    { header: 'Main Menu' },
+    // --- Kategori: Menu Utama ---
+    { header: 'Menu Utama' },
     {
         title: 'Dashboard',
         icon: LayoutDashboardIcon,
         to: '/'
     },
+
+    // --- Kategori: Transaksi Operasional & Keuangan ---
+    { header: 'Transaksi' },
     {
         title: 'Job Order',
         icon: ClipboardListIcon,
         to: '/job-order'
     },
     {
+        title: 'Sales Invoice (AR)', // Piutang Dagang
+        icon: FileInvoiceIcon,
+        to: '/invoice'
+    },
+    {
+        title: 'Tagihan Vendor (AP)', // Hutang Dagang
+        icon: FileInvoiceIcon,
+        to: '/bill'
+    },
+    {
         title: 'Kasbon & Biaya',
         icon: WalletIcon,
         to: '/kasbon'
-    },
-    {
-        title: 'Sales Invoice',
-        icon: FileInvoiceIcon,
-        to: '/invoice'
     },
     {
         title: 'Penerimaan Lain',
@@ -59,24 +68,37 @@ const sidebarItem: menu[] = [
         icon: ArrowsLeftRightIcon,
         to: '/transfer'
     },
+    
+    // --- Kategori: Laporan & Analisis ---
+    { header: 'Laporan & Analisis' },
     {
         title: 'Laporan',
         icon: ChartBarIcon,
         to: '/laporan'
-    },    
+    },
     {
         title: 'Rekonsiliasi Bank',
         icon: ArrowsLeftRightIcon,
         to: '/rekon'
     },
-    { header: 'Admin' },
+
+    // --- Kategori: Master Data ---
+    { header: 'Master Data' },
+    {
+        title: 'Setting Pajak',
+        icon: SettingsIcon, 
+        to: '/master/tax'
+    },
+
+    // --- Kategori: Administrasi & Konfigurasi Sistem ---
+    { header: 'Administrasi & Pengaturan' },
     {
         title: 'Manajemen User',
         icon: UsersIcon,
         to: '/users'
     },
     {
-        title: 'Setting Approver', // MENU BARU
+        title: 'Setting Approver',
         icon: ShieldCheckIcon,
         to: '/approver-settings'
     },
@@ -84,17 +106,6 @@ const sidebarItem: menu[] = [
         title: 'Konfigurasi Sistem',
         icon: SettingsIcon,
         to: '/settings'
-    },
-    { header: 'Master Data' },
-    {
-        title: 'Setting Pajak',
-        icon: SettingsIcon,
-        to: '/master/tax'
-    },
-    {
-        title: 'Tagihan Vendor (AP)',
-        icon: FileInvoiceIcon,
-        to: '/bill'
     },
 ];
 
