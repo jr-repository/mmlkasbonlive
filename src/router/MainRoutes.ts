@@ -46,13 +46,20 @@ const MainRoutes = {
             path: '/laporan',
             component: () => import('@/views/akuntansi/LaporanPage.vue')
         },
+        // --- MODUL BARU: USER ACTIVITY REPORT ---
+        {
+            name: 'UserActivityReport',
+            path: '/report/user-activity',
+            component: () => import('@/views/laporan/UserActivityPage.vue')
+        },
+        // ----------------------------------------
         {
             name: 'Users',
             path: '/users',
             component: () => import('@/views/akuntansi/UserSettingPage.vue')
         },
         {
-            name: 'ApproverSettings', // ROUTE BARU
+            name: 'ApproverSettings',
             path: '/approver-settings',
             component: () => import('@/views/akuntansi/ApproverSettingPage.vue')
         },
@@ -62,9 +69,14 @@ const MainRoutes = {
             component: () => import('@/views/akuntansi/AccurateSettingsPage.vue')
         },
         {
-            name: 'Rekon',
+            name: 'RekonMandiri',
             path: '/rekon',
             component: () => import('@/views/rekon/RekonPage.vue')
+        },
+        {
+            name: 'RekonCimb',
+            path: '/rekon/cimb',
+            component: () => import('@/views/rekon/RekonCimbPage.vue')
         },
         {
             name: 'RekonSettings',

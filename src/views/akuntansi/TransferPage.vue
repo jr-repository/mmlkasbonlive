@@ -2,6 +2,7 @@
 // FIX: Tambahkan onBeforeUnmount
 import { ref, reactive, onMounted, watch, onBeforeUnmount } from 'vue';
 import { format } from 'date-fns';
+import { useAuthStore } from '@/stores/auth'; // Import Store
 import UiParentCard from '@/components/shared/UiParentCard.vue';
 import AsyncSelect from '@/components/common/AsyncSelect.vue';
 import { 
@@ -19,6 +20,7 @@ import {
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
+const authStore = useAuthStore(); // Init Store
 
 // FIX: Pindahkan deklarasi timer ke lingkup script setup
 let searchTimeout: ReturnType<typeof setTimeout> | null = null; 
@@ -108,7 +110,9 @@ const handleSubmit = async () => {
       fromBankId: form.fromBankId,
       toBankId: form.toBankId,
       amount: form.amount,
-      description: form.description || "Transfer Antar Bank"
+      description: form.description || "Transfer Antar Bank",
+      user_id: authStore.userData?.id,
+      user_name: authStore.userData?.name
     };
     const res = await fetch(`${API_BASE_URL}/Transfer/Transaksi.php`, {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)

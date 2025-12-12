@@ -18,42 +18,19 @@ const sidebarMenu = shallowRef(sidebarItems);
 const menuKeyMap: Record<string, string> = {
     'Dashboard': 'dashboard',
     'Job Order': 'job_order',
-    'Sales Invoice (AR)': 'invoice', // Updated Title
-    'Tagihan Vendor (AP)': 'bill',   // New Menu
+    'Sales Invoice (AR)': 'invoice', 
+    'Tagihan Vendor (AP)': 'bill',   
     'Kasbon & Biaya': 'kasbon',
     'Penerimaan Lain': 'penerimaan',
     'Transfer Bank': 'transfer',
     'Laporan': 'laporan',
-    'Rekonsiliasi Bank': 'rekon',
-    'Setting Pajak': 'master_tax',   // New Menu
+    'Aktivitas User': 'laporan', // Mapping menu baru ke permission 'laporan'
+    'Rekonsiliasi Bank': 'rekon',   
+    'Setting Pajak': 'master_tax',   
     'Manajemen User': 'users',
-    'Setting Approver': 'approver_settings', // New Menu
+    'Setting Approver': 'approver_settings', 
     'Konfigurasi Sistem': 'settings'
 };
-// Filter Menu Logic
-const filteredMenu = computed(() => {
-    // Jika Admin, tampilkan semua
-    if (authStore.isAdmin) return sidebarMenu.value;
-
-    const userPerms = authStore.userData?.permissions || [];
-    
-    return sidebarMenu.value.map(group => {
-        // Clone group
-        const newGroup = { ...group };
-        
-        // Filter children jika ada (item menu asli ada di children karena struktur NavGroup)
-        if (newGroup.children) {
-            // Kita anggap item level 1 yang punya 'to' adalah menu
-            // Struktur sidebarItem.ts saat ini: { header: 'Main' }, { title: 'Dashboard', to: '/' } ...
-            // Tapi sidebarItem.ts yang Anda upload adalah FLAT ARRAY yang dicampur header dan item
-            // Logic Vuetify sidebar loop-nya: v-for item in sidebarMenu
-            
-            // KARENA STRUKTUR `sidebarItem.ts` adalah Array Campuran (Header & Item), kita filter Array utamanya.
-            return null; // Dummy return, logic sesungguhnya di bawah (karena sidebarMenu adalah array flat)
-        }
-        return newGroup;
-    });
-});
 
 // Logic Filter Flat Array Sidebar
 const displayedItems = computed(() => {
@@ -65,7 +42,18 @@ const displayedItems = computed(() => {
         // Selalu tampilkan Header
         if (item.header) return true;
 
-        // Cek Title
+        // Jika item punya children (seperti Rekonsiliasi Bank)
+        if (item.children) {
+            const parentKey = menuKeyMap[item.title || ''];
+            // Tampilkan parent jika user punya hak akses ke parentKey ('rekon')
+            if (parentKey && userPerms.includes(parentKey)) {
+                return true;
+            }
+            // Jika tidak ada permission untuk parent, jangan tampilkan
+            return false;
+        }
+
+        // Cek item level 1 yang biasa (tanpa children)
         const key = menuKeyMap[item.title || ''];
         if (!key) return true; // Jika tidak ada di map, anggap public (atau hide jika strict)
         

@@ -3,14 +3,14 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useCustomizerStore } from '@/stores/customizer';
 import { useAuthStore } from '@/stores/auth';
-import { Menu2Icon } from 'vue-tabler-icons'; // Pengganti MenuFoldOutlined
+import { Menu2Icon } from 'vue-tabler-icons';
 import ProfileDD from './ProfileDD.vue';
+import NotificationDD from './NotificationDD.vue';
 
 const customizer = useCustomizerStore();
 const authStore = useAuthStore();
 const route = useRoute();
 
-// --- LOGIKA DATA SAYA (Breadcrumb) ---
 const routeNames: Record<string, string> = {
     'Dashboard': 'Dashboard',
     'JobOrder': 'Job Order',
@@ -25,47 +25,49 @@ const routeNames: Record<string, string> = {
 };
 const pageTitle = computed(() => routeNames[route.name as string] || 'Halaman');
 
-// --- LOGIKA DATA SAYA (Waktu Real-time) ---
 const currentTime = ref(new Date());
 let timer: any;
 onMounted(() => { timer = setInterval(() => currentTime.value = new Date(), 1000); });
 onUnmounted(() => { if (timer) clearInterval(timer); });
 
-const formattedDate = computed(() => currentTime.value.toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short", year: "numeric" }));
-const formattedTime = computed(() => currentTime.value.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }));
+const formattedDate = computed(() => currentTime.value.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
+const formattedTime = computed(() => currentTime.value.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).replace(/\./g, ':'));
 
-// --- LOGIKA DATA SAYA (User) ---
-const user = computed(() => authStore.userData || { name: 'User', role: 'Staff' });
+const user = computed(() => authStore.userData || { name: 'User', role: 'Guest' });
 </script>
 
 <template>
-  <v-app-bar elevation="0" height="60" class="bg-surface border-b">
+  <v-app-bar elevation="0" height="70" class="main-head">
     <v-btn
-      class="text-secondary mr-3 ml-2"
-      color="darkText"
-      icon
-      rounded="sm"
-      variant="text"
-      @click.stop="customizer.SET_SIDEBAR_DRAWER"
+      class="hidden-lg-and-up text-secondary ms-md-3 ms-sm-5 ms-3"
       size="small"
+      icon
+      @click="customizer.SET_SIDEBAR_DRAWER"
+      variant="text"
     >
-      <Menu2Icon size="20" />
+      <Menu2Icon size="20" stroke-width="1.5" />
     </v-btn>
 
-    <div class="d-none d-lg-block ml-2">
-        <span class="text-caption text-grey-darken-1">App / </span>
-        <span class="text-subtitle-2 font-weight-bold text-grey-darken-2">{{ pageTitle }}</span>
+    <div class="ml-4 d-none d-sm-block">
+        <h3 class="text-h6 font-weight-bold text-primary mb-0">{{ pageTitle }}</h3>
+        <div class="text-caption text-medium-emphasis">Sistem Manajemen Keuangan</div>
     </div>
 
     <v-spacer />
 
-           <div class="d-flex align-center bg-green-lighten-5 px-2 py-0 rounded-pill border">
-            <span class="position-relative d-flex h-2 w-2 mr-1">
-              <span class="position-absolute d-inline-flex h-100 w-100 rounded-circle bg-success opacity-75 animate-ping"></span>
-              <span class="position-relative d-inline-flex rounded-circle h-2 w-2 bg-success"></span>
+    <div class="mr-3">
+        <NotificationDD />
+    </div>
+
+    <div class="d-none d-sm-flex align-center mr-4">
+        <div class="bg-green-lighten-5 px-3 py-1 rounded-pill d-flex align-center gap-2 border border-success">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-circle bg-success opacity-75"></span>
+              <span class="relative d-inline-flex rounded-circle h-2 w-2 bg-success"></span>
             </span>
             <span class="text-[10px] font-weight-bold text-success">Online</span>
           </div>
+    </div>
 
     <div class="d-none d-sm-flex flex-column align-end mr-4 text-right">
         <div class="text-caption font-weight-bold">{{ formattedDate }}</div>
@@ -94,11 +96,33 @@ const user = computed(() => authStore.userData || { name: 'User', role: 'Staff' 
 </template>
 
 <style scoped>
-/* Animasi Ping untuk Status Online */
-@keyframes ping {
-    75%, 100% { transform: scale(2); opacity: 0; }
+.main-head {
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    background-color: white;
 }
-.animate-ping { animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite; }
-.h-2 { height: 8px; }
-.w-2 { width: 8px; }
+.profileBtn {
+    height: auto !important;
+    padding: 4px 8px;
+}
+.text-[10px] { font-size: 10px; }
+.relative { position: relative; }
+.absolute { position: absolute; }
+.flex { display: flex; }
+.inline-flex { display: inline-flex; }
+.h-full { height: 100%; }
+.w-full { width: 100%; }
+.h-2 { height: 0.5rem; }
+.w-2 { width: 0.5rem; }
+.rounded-circle { border-radius: 50%; }
+.opacity-75 { opacity: 0.75; }
+
+@keyframes ping {
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+.animate-ping {
+  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
 </style>

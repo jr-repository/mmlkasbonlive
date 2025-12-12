@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch, onBeforeUnmount } from 'vue'; // FIX: Tambahkan onBeforeUnmount
+import { ref, reactive, onMounted, watch, onBeforeUnmount } from 'vue'; 
 import { format } from 'date-fns';
 import AsyncSelect from '@/components/common/AsyncSelect.vue';
+import { useAuthStore } from '@/stores/auth';
 
-// Icons
 import { 
   PlusIcon, 
   TrashIcon, 
@@ -13,15 +13,14 @@ import {
   FileDescriptionIcon,
   XIcon,
   CalendarEventIcon,
-  UserIcon // Icon PIC
+  UserIcon 
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
+const authStore = useAuthStore();
 
-// FIX: Pindahkan deklarasi searchTimeout ke lingkup atas dan tetapkan tipenya
 let searchTimeout: ReturnType<typeof setTimeout> | null = null; 
 
-// --- STATE LIST DATA ---
 const search = ref('');
 const loadingList = ref(false);
 const jobOrderList = ref<any[]>([]);
@@ -31,36 +30,32 @@ const headers = [
   { title: 'JO Number', key: 'number', align: 'start' as const },
   { title: 'Date', key: 'transDate', align: 'start' as const },
   { title: 'Customer', key: 'customerName', align: 'start' as const },
-  { title: 'PIC', key: 'pic', align: 'start' as const }, // KOLOM BARU
+  { title: 'PIC', key: 'pic', align: 'start' as const }, 
   { title: 'Description', key: 'description', align: 'start' as const },
   { title: 'Status', key: 'status', align: 'center' as const },
   { title: 'Actions', key: 'actions', align: 'center' as const, sortable: false },
 ];
 
-// --- STATE FORM ---
 const form = reactive({
   transDate: format(new Date(), 'yyyy-MM-dd'),
   jobNumber: '',
   customerNo: '',
-  customerName: '', // Simpan nama untuk DB lokal
-  pic: '', // FIELD BARU
+  customerName: '', 
+  pic: '', 
   description: '',
   items: [{ id: Date.now(), no: '', name: '', quantity: 1 }]
 });
 const saving = ref(false);
 
-// --- STATE MODAL DETAIL ---
 const dialogDetail = ref(false);
 const detailData = ref<any>(null);
 const loadingDetail = ref(false);
 
-// --- STATE SNACKBAR ---
 const snackbar = reactive({ show: false, text: '', color: 'success' });
 const showMsg = (text: string, color = 'success') => {
   snackbar.text = text; snackbar.color = color; snackbar.show = true;
 };
 
-// --- METHODS LIST ---
 const fetchList = async () => {
   loadingList.value = true;
   try {
@@ -84,13 +79,11 @@ const fetchList = async () => {
   }
 };
 
-// FIX: Debounce logic sudah benar, memanggil fetchList saat search berubah
 watch(search, () => {
-  if (searchTimeout) clearTimeout(searchTimeout); // FIX: Clear timeout sebelumnya
-  searchTimeout = setTimeout(fetchList, 600); // FIX: Terapkan debounce 600ms
+  if (searchTimeout) clearTimeout(searchTimeout); 
+  searchTimeout = setTimeout(fetchList, 600); 
 });
 
-// --- METHODS FORM ---
 const addItem = () => {
   form.items.push({ id: Date.now(), no: '', name: '', quantity: 1 });
 };
@@ -101,7 +94,6 @@ const removeItem = (index: number) => {
 
 const onItemChange = (index: number, obj: any) => {
   if (obj) {
-    // FIX: Pastikan item.no juga terisi jika itemValue di AsyncSelect adalah 'no'
     form.items[index].no = obj.no;
     form.items[index].name = obj.name;
   }
@@ -126,12 +118,12 @@ const resetForm = () => {
 
 const handleSubmit = async () => {
   if (!form.jobNumber || !form.customerNo) return showMsg('Lengkapi data Customer & Nomor JO', 'error');
-  if (!form.pic) return showMsg('PIC Pelaksana wajib diisi', 'error'); // Validasi PIC
+  if (!form.pic) return showMsg('PIC Pelaksana wajib diisi', 'error'); 
   
   saving.value = true;
   try {
     const payload = {
-      transDate: form.transDate, // Kirim format Y-m-d biar backend proses
+      transDate: form.transDate, 
       customerNo: form.customerNo,
       customerName: form.customerName,
       pic: form.pic,
@@ -139,9 +131,11 @@ const handleSubmit = async () => {
       description: form.description,
       detailItem: form.items.map(i => ({ 
         itemNo: i.no, 
-        itemName: i.name, // Kirim nama item untuk DB lokal
+        itemName: i.name, 
         quantity: i.quantity 
-      }))
+      })),
+      user_id: authStore.userData?.id,
+      user_name: authStore.userData?.name
     };
 
     const res = await fetch(`${API_BASE_URL}/JobOrder/Transaksi.php`, {
@@ -154,10 +148,9 @@ const handleSubmit = async () => {
     if (json.s) {
       showMsg('Job Order Berhasil Disimpan!');
       resetForm();
-      fetchList(); // FIX: Panggil fetchList setelah simpan
+      fetchList(); 
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      // FIX: Pertahankan logic asli penanganan error yang kompleks
       showMsg(json.d ? (Array.isArray(json.d) ? json.d.join(', ') : json.d?.message || 'Gagal') : 'Gagal simpan', 'error');
     }
   } catch (e) {
@@ -187,7 +180,6 @@ onMounted(() => {
   fetchList();
 });
 
-// FIX: Tambahkan onBeforeUnmount untuk membersihkan debounce timer
 onBeforeUnmount(() => {
   if (searchTimeout) clearTimeout(searchTimeout);
 });
@@ -582,7 +574,6 @@ onBeforeUnmount(() => {
   box-shadow: none !important;
 }
 
-/* Override input styling for compactness */
 .small-input :deep(.v-field) {
     --v-field-padding-bottom: 4px;
     --v-field-padding-top: 4px;
@@ -606,7 +597,6 @@ onBeforeUnmount(() => {
     min-height: 50px !important;
 }
 
-/* Specific item input inside table */
 .small-input-in-table :deep(.v-field) {
     min-height: 32px !important;
     padding-top: 2px !important;
@@ -620,22 +610,19 @@ onBeforeUnmount(() => {
     height: 20px !important;
 }
 
-/* Item table row/cell padding */
 .item-table-form :deep(td) {
     padding-top: 4px !important;
     padding-bottom: 4px !important;
 }
 
-/* Data table custom styling */
 .compact-data-table :deep(.v-data-table__td) {
     font-size: 0.75rem !important;
-    height: 38px !important; /* Dikecilkan */
+    height: 38px !important; 
 }
 .compact-data-table :deep(.v-data-table-header) th {
-    height: 35px !important; /* Dikecilkan */
+    height: 35px !important; 
 }
 
-/* Search Input inside colored bar */
 .small-search-input :deep(.v-field) {
     min-height: 36px !important;
 }
@@ -654,7 +641,6 @@ onBeforeUnmount(() => {
     margin-top: 2px;
 }
 
-/* Detail dialog font and layout */
 .dialog-detail-content {
     font-size: 0.8rem;
 }

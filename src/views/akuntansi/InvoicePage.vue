@@ -6,17 +6,17 @@ import UiParentCard from '@/components/shared/UiParentCard.vue';
 import AsyncSelect from '@/components/common/AsyncSelect.vue';
 import { 
  PlusIcon, TrashIcon, EyeIcon, DeviceFloppyIcon, XIcon, WalletIcon,
- CheckIcon, BanIcon, PencilIcon, SearchIcon, FileInvoiceIcon, ListCheckIcon, FormsIcon // FIX: Tambahkan FormsIcon
+ CheckIcon, BanIcon, PencilIcon, SearchIcon, FileInvoiceIcon, ListCheckIcon, FormsIcon, ClockIcon 
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
 const authStore = useAuthStore();
 
-// FIX: Tambahkan variabel untuk debounce timer
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // --- STATE NAVIGASI TAB BARU ---
-const tab = ref(1); // Default ke Tab 1 (History)
+const tab = ref(1); 
+const filterStatus = ref('ALL'); 
 
 // --- STATE ---
 const loadingList = ref(false);
@@ -28,6 +28,7 @@ const taxList = ref<any[]>([]);
 const form = reactive({
  id: 0, 
  transDate: format(new Date(), 'yyyy-MM-dd'),
+ dueDate: format(new Date(), 'yyyy-MM-dd'), 
  customerNo: '',
  customerName: '',
  description: '',
@@ -51,7 +52,7 @@ const isEditing = ref(false);
 
 // --- MODAL DETAIL ITEM STATE BARU ---
 const dialogItemDetail = ref(false);
-const editingItemIndex = ref(-1); // Index item yang sedang diedit di form.items
+const editingItemIndex = ref(-1); 
 const itemDetailForm = reactive({
  itemNo: '', 
  itemName: '', 
@@ -60,13 +61,21 @@ const itemDetailForm = reactive({
  itemDiscPercent: '', 
  ppnRate: 0, 
  pphRate: 0,
- // Tambahkan properti bantu untuk input AsyncSelect
  asyncSelectValue: null as any 
 });
 
 // --- DETAIL STATE ---
 const dialogDetail = ref(false);
 const detailData = ref<any>(null);
+const dialogPayment = ref(false); 
+const paymentForm = reactive({ 
+    invoiceId: 0,
+    paidAmount: 0,
+    paidDate: format(new Date(), 'yyyy-MM-dd'),
+    files: [] as File[],
+    note: ''
+});
+const updatingPayment = ref(false);
 const approving = ref(false);
 const rejecting = ref(false);
 
@@ -119,8 +128,18 @@ const totalPPh = computed(() => {
  return tot * (1 - (form.globalDiscPercent/100));
 });
 
-const grandTotal = computed(() => taxableAmount.value + totalPPN.value - totalPPh.value); // FIX: PPh seharusnya mengurangi grandTotal
+const grandTotal = computed(() => taxableAmount.value + totalPPN.value - totalPPh.value); 
 const netBalance = computed(() => grandTotal.value - form.downPayment);
+
+const filteredInvoiceList = computed(() => {
+  let list = invoiceList.value;
+  if(filterStatus.value !== 'ALL') {
+    list = list.filter(item => item.status === filterStatus.value || (filterStatus.value === 'SUBMITTED' && item.status === 'WAITING_PAYMENT'));
+  }
+  return list;
+});
+
+const isOverdue = (days: number) => days > 0;
 
 // --- METHODS ---
 const fetchTaxes = async () => {
@@ -136,10 +155,9 @@ const getDefaultTax = (type: string) => {
  return t ? t.rate : 0;
 };
 
-// FIX: Pindahkan fetchList ke fungsi debounced
 const fetchListDebounced = () => {
  if (searchTimeout) clearTimeout(searchTimeout);
- searchTimeout = setTimeout(fetchList, 400); // FIX: Debounce 400ms untuk input pencarian
+ searchTimeout = setTimeout(fetchList, 400); 
 };
 
 const fetchList = async () => {
@@ -149,7 +167,12 @@ const fetchList = async () => {
   if(search.value) url.searchParams.append('q', search.value);
   const res = await fetch(url.toString());
   const json = await res.json();
-  if(json.s) invoiceList.value = json.d.map((x:any, i:number) => ({...x, index: i+1}));
+  if(json.s) invoiceList.value = json.d.map((x:any, i:number) => ({
+    ...x, 
+    index: i+1,
+    dueDate: x.dueDate,
+    agingDays: x.agingDays
+  }));
  } finally { loadingList.value = false; }
 };
 
@@ -158,7 +181,6 @@ const addItem = () => {
   id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', 
   ppnRate: getDefaultTax('PPN'), pphRate: getDefaultTax('PPH') 
  });
- // Langsung buka modal untuk item baru
  openItemDetailModal(form.items[form.items.length - 1], form.items.length - 1);
 };
 
@@ -173,7 +195,6 @@ const onCustChange = (obj: any) => {
  }
 };
 
-// Fungsi ini diubah untuk hanya memicu perubahan AsyncSelect di modal
 const onItemChange = (obj: any) => {
  if(obj) {
   itemDetailForm.itemNo = obj.no;
@@ -184,10 +205,11 @@ const onItemChange = (obj: any) => {
 
 const resetForm = () => {
  form.id = 0;
+ form.transDate = format(new Date(), 'yyyy-MM-dd');
+ form.dueDate = format(new Date(), 'yyyy-MM-dd'); 
  form.customerNo = ''; 
  form.customerName = '';
  form.description = '';
- // FIX: Saat reset, pastikan item list juga menggunakan tax default yang baru
  form.items = [{ id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', ppnRate: getDefaultTax('PPN'), pphRate: getDefaultTax('PPH') }];
  form.downPayment = 0; 
  form.globalDiscPercent = 0;
@@ -195,13 +217,13 @@ const resetForm = () => {
 };
 
 const handleEdit = async (item: any) => {
- // FIX: Menggunakan await/then secara terpisah untuk kejelasan, namun chaining di sini tidak berlebihan
  const res = await fetch(`${API_BASE_URL}/Invoice/Detail.php?id=${item.id}`);
  const json = await res.json();
  if(json.s) {
   const d = json.d;
   form.id = d.id;
   form.transDate = d.transDate; 
+  form.dueDate = d.dueDate; 
   form.customerNo = d.customer.customerNo;
   form.customerName = d.customer.name;
   form.description = d.description;
@@ -215,13 +237,12 @@ const handleEdit = async (item: any) => {
    quantity: x.quantity,
    unitPrice: x.unitPrice,
    itemDiscPercent: x.itemDiscPercent,
-   // FIX: Pertahankan logic asli, namun gunakan default tax jika API tidak menyediakan
    ppnRate: x.ppnRate || getDefaultTax('PPN'), 
    pphRate: x.pphRate || getDefaultTax('PPH')
   }));
   
   isEditing.value = true;
-  tab.value = 2; // Pindah ke tab New Entry setelah Edit
+  tab.value = 2; 
   window.scrollTo({ top: 0, behavior: 'smooth' });
  }
 };
@@ -231,16 +252,21 @@ const handleSubmit = async () => {
  if(form.items.some(i => !i.itemNo)) return showMsg("Ada Item yang belum dipilih", "error");
  saving.value = true;
  try {
+  const payload = {
+      ...form,
+      dueDate: form.dueDate || format(new Date(), 'yyyy-MM-dd'),
+      user_id: authStore.userData?.id,
+      user_name: authStore.userData?.name
+  }
   const res = await fetch(`${API_BASE_URL}/Invoice/Transaksi.php`, {
-   method: 'POST', body: JSON.stringify(form)
+   method: 'POST', body: JSON.stringify(payload)
   });
   const json = await res.json();
   if(json.s) {
    showMsg(json.message);
-   // FIX: Panggil fetchList untuk refresh data setelah sukses
    fetchList(); 
    resetForm();
-      tab.value = 1; // Pindah ke tab History setelah Submit
+      tab.value = 1; 
   } else {
    showMsg(json.message, "error");
   }
@@ -249,7 +275,7 @@ const handleSubmit = async () => {
 };
 
 const handleApprove = async (id: number) => {
- if(!confirm("Yakin Approve?")) return;
+ if(!confirm("Yakin Approve? Transaksi akan dikirim ke Accurate dan status berubah menjadi Waiting Payment (SUBMITTED).")) return;
  approving.value = true;
  try {
   const res = await fetch(`${API_BASE_URL}/Invoice/Approve.php`, {
@@ -258,7 +284,6 @@ const handleApprove = async (id: number) => {
   const json = await res.json();
   if(json.s) {
    showMsg(json.message);
-   // FIX: Panggil fetchList untuk refresh data setelah sukses
    fetchList(); 
    dialogDetail.value = false;
   } else {
@@ -278,7 +303,6 @@ const handleReject = async (id: number) => {
   const json = await res.json();
   if(json.s) {
    showMsg(json.message, "warning");
-   // FIX: Panggil fetchList untuk refresh data setelah sukses
    fetchList();
    dialogDetail.value = false;
   } else {
@@ -291,13 +315,70 @@ const handleReject = async (id: number) => {
 const openDetail = async (id: number) => {
  dialogDetail.value = true;
  detailData.value = null;
- // FIX: Menggunakan await/then secara terpisah untuk kejelasan, tidak perlu diperbaiki
  const res = await fetch(`${API_BASE_URL}/Invoice/Detail.php?id=${id}`);
  const json = await res.json();
- if(json.s) detailData.value = json.d;
+ if(json.s) {
+    const d = json.d;
+    detailData.value = d;
+    // Inisiasi form payment saat membuka detail (walaupun modalnya belum dibuka)
+    paymentForm.invoiceId = d.id;
+    paymentForm.paidAmount = d.summary.net;
+    paymentForm.paidDate = format(new Date(), 'yyyy-MM-dd');
+    paymentForm.files = [];
+    paymentForm.note = '';
+ }
 };
 
-// --- FUNGSI MODAL DETAIL ITEM BARU ---
+const openPaymentModal = (item: any) => {
+  paymentForm.invoiceId = item.id;
+  paymentForm.paidAmount = item.netBalance;
+  paymentForm.paidDate = format(new Date(), 'yyyy-MM-dd');
+  paymentForm.files = [];
+  paymentForm.note = '';
+  dialogPayment.value = true;
+};
+
+const handlePaymentSubmit = async () => {
+    if(paymentForm.paidAmount <= 0) return showMsg("Jumlah pembayaran harus lebih dari 0", "error");
+
+    updatingPayment.value = true;
+    const formData = new FormData();
+    formData.append("id", String(paymentForm.invoiceId));
+    formData.append("paidAmount", String(paymentForm.paidAmount));
+    formData.append("paidDate", paymentForm.paidDate);
+    formData.append("user_id", String(authStore.userData?.id || 0));
+    formData.append("note", paymentForm.note);
+    
+    if(paymentForm.files.length === 0) {
+        showMsg("Wajib mengupload bukti pembayaran", "error");
+        updatingPayment.value = false;
+        return;
+    }
+    paymentForm.files.forEach((file) => {
+        formData.append("files[]", file);
+    });
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/Invoice/Pay.php`, { 
+            method: "POST", 
+            body: formData 
+        });
+        const json = await res.json();
+        
+        if (json.s) {
+            showMsg(json.message, "success");
+            dialogPayment.value = false;
+            fetchList();
+        } else {
+            showMsg(json.message || "Gagal update status PAID", "error");
+        }
+    } catch {
+        showMsg("Terjadi kesalahan koneksi saat update status PAID.", "error");
+    } finally {
+        updatingPayment.value = false;
+    }
+};
+
 const openItemDetailModal = (item: any, index: number) => {
  editingItemIndex.value = index;
  itemDetailForm.itemNo = item.itemNo;
@@ -307,14 +388,12 @@ const openItemDetailModal = (item: any, index: number) => {
  itemDetailForm.itemDiscPercent = item.itemDiscPercent;
  itemDetailForm.ppnRate = item.ppnRate;
  itemDetailForm.pphRate = item.pphRate;
- // Penting: Set nilai asyncSelectValue untuk memuat nilai itemNo saat modal dibuka
  itemDetailForm.asyncSelectValue = item.itemNo;
  dialogItemDetail.value = true;
 };
 
 const saveItemDetail = () => {
  if (editingItemIndex.value >= 0) {
-  // Pastikan Item Name sudah terisi saat menyimpan
   if(!itemDetailForm.itemName) {
    return showMsg("Pilih Item terlebih dahulu!", "error");
   }
@@ -333,18 +412,16 @@ const saveItemDetail = () => {
 };
 
 // --- HOOKS & WATCHERS ---
-// FIX: Gunakan watch untuk memanggil fetchList Debounced saat search berubah
 watch(search, fetchListDebounced); 
+watch(filterStatus, fetchListDebounced); 
 
 onMounted(() => {
  fetchTaxes().then(() => {
   if(form.items.length > 0) {
-   // FIX: Memastikan default tax rate diterapkan saat mounted
    form.items[0].ppnRate = getDefaultTax('PPN');
    form.items[0].pphRate = getDefaultTax('PPH');
   }
  });
- // FIX: Panggil fetchList satu kali saat mounted untuk memuat data awal
  fetchList(); 
 });
 </script>
@@ -387,7 +464,17 @@ onMounted(() => {
          <h3 class="text-subtitle-1 font-weight-bold text-primary">All Invoice Records</h3>
         </div>
         
-        <div class="d-flex align-center gap-1">
+        <div class="d-flex align-center gap-1" style="min-width: 350px;">
+          <v-select
+              v-model="filterStatus"
+              :items="['ALL', 'DRAFT', 'WAITING_APPROVAL', 'REJECTED', 'SUBMITTED', 'PAID']"
+              label="Filter Status"
+              density="compact"
+              variant="solo-filled"
+              hide-details
+              bg-color="white"
+              class="rounded small-search-input"
+          ></v-select>
          <v-text-field
           v-model="search"
           density="compact"
@@ -407,14 +494,16 @@ onMounted(() => {
 
        <v-data-table 
         :headers="[
-         { title: 'No', key: 'index', align:'center' as const },
-         { title: 'Invoice #', key: 'number', align:'start' as const },
+         { title: 'No', key: 'index', align:'center' as const, width:'30px' },
+         { title: 'Invoice #', key: 'number', align:'start' as const, width:'100px' },
          { title: 'Customer', key: 'customerName', align:'start' as const },
-         { title: 'Total Amount', key: 'totalAmount', align:'end' as const },
-         { title: 'Status', key: 'status', align:'center' as const },
-         { title: 'Action', key: 'actions', align:'center' as const }
+         { title: 'Due Date', key: 'dueDate', align:'center' as const, width:'100px' },
+         { title: 'Aging Days', key: 'agingDays', align:'center' as const, width:'100px' },
+         { title: 'Net Balance', key: 'netBalance', align:'end' as const, width:'120px' },
+         { title: 'Status', key: 'status', align:'center' as const, width:'120px' },
+         { title: 'Action', key: 'actions', align:'center' as const, width:'80px' }
         ]" 
-        :items="invoiceList" 
+        :items="filteredInvoiceList" 
         :loading="loadingList" 
         density="compact"
         hover
@@ -434,28 +523,64 @@ onMounted(() => {
          <span class="font-weight-bold text-primary text-caption">{{ item.number }}</span>
         </template>
         
-        <template v-slot:item.totalAmount="{ item }">
-         <span class="text-subtitle-2 font-weight-bold">Rp {{ Number(item.totalAmount).toLocaleString('id-ID') }}</span>
+        <template v-slot:item.dueDate="{ item }">
+          <span class="text-caption">{{ item.dueDate }}</span>
+        </template>
+
+        <template v-slot:item.agingDays="{ item }">
+          <v-chip
+            v-if="['SUBMITTED', 'WAITING_APPROVAL', 'DRAFT'].includes(item.status) && item.dueDate !== '-'"
+            size="x-small" 
+            label
+            :color="isOverdue(item.agingDays) ? 'red' : (item.agingDays < 0 ? 'grey' : 'orange')"
+            variant="flat"
+            class="font-weight-bold text-caption"
+          >
+            <ClockIcon size="14" class="mr-1" v-if="item.agingDays < 0"/>
+            {{ item.agingDays < 0 ? `T-${Math.abs(item.agingDays)}` : `${item.agingDays} Hari` }}
+          </v-chip>
+          <span v-else class="text-caption">-</span>
+        </template>
+        
+        <template v-slot:item.netBalance="{ item }">
+         <span class="text-caption font-weight-bold">Rp {{ Number(item.netBalance).toLocaleString('id-ID') }}</span>
         </template>
         
         <template v-slot:item.status="{ item }">
          <v-chip 
           size="x-small" 
           variant="tonal"
-          class="font-weight-bold text-uppercase"
-          :color="item.status === 'SUBMITTED' ? 'green' : (item.status === 'REJECTED' ? 'red' : 'orange')"
+          class="font-weight-bold text-uppercase text-caption"
+          :color="item.status === 'SUBMITTED' ? 'orange' : (item.status === 'REJECTED' ? 'red' : (item.status === 'PAID' ? 'green' : (item.status === 'WAITING_APPROVAL' ? 'blue' : 'grey')))"
          >
-          {{ item.status.replace('_', ' ') }}
+          {{ item.status === 'SUBMITTED' ? 'WAITING PAYMENT' : item.status.replace('_', ' ') }}
          </v-chip>
         </template>
         
         <template v-slot:item.actions="{ item }">
-         <v-btn icon variant="text" color="primary" size="x-small" @click="openDetail(item.id)">
+         <v-btn icon variant="text" color="primary" size="x-small" @click="openDetail(item.id)" title="View Detail">
           <EyeIcon size="16" />
          </v-btn>
-         <v-btn v-if="['WAITING_APPROVAL', 'REJECTED', 'DRAFT'].includes(item.status)" 
-          icon color="orange" variant="text" size="x-small" @click="handleEdit(item)">
+         <v-btn 
+            v-if="['DRAFT', 'WAITING_APPROVAL', 'REJECTED'].includes(item.status)" 
+            icon color="orange" 
+            variant="text" 
+            size="x-small" 
+            @click="handleEdit(item)"
+            title="Edit"
+        >
           <PencilIcon size="16"/>
+         </v-btn>
+         <v-btn 
+            v-if="item.status === 'SUBMITTED'" 
+            icon 
+            color="success" 
+            variant="text" 
+            size="x-small" 
+            @click="openPaymentModal(item)"
+            title="Input Payment"
+        >
+          <WalletIcon size="16"/>
          </v-btn>
         </template>
        </v-data-table>
@@ -482,6 +607,16 @@ onMounted(() => {
           class="mb-2 small-input"
          ></v-text-field>
          
+         <v-text-field 
+          type="date" 
+          label="Due Date" 
+          v-model="form.dueDate" 
+          variant="outlined" 
+          density="compact"
+          hide-details
+          class="mb-2 small-input"
+         ></v-text-field>
+
          <AsyncSelect 
           label="Select Customer" 
           :apiEndpoint="`${API_BASE_URL}/Invoice/MasterCustomer.php`" 
@@ -806,11 +941,11 @@ onMounted(() => {
        </div>
        <div class="d-flex align-center gap-1 mb-1 text-grey-darken-1 text-caption">
         <v-icon size="14">mdi-calendar-month</v-icon>
-        <span>{{ detailData.transDate }}</span>
+        <span>Trans: {{ detailData.transDate }} | Due: {{ detailData.dueDate }}</span>
        </div>
        <div class="d-flex align-center gap-1 text-grey-darken-2 text-caption">
-        <v-chip size="x-small" variant="flat" :color="detailData.status === 'SUBMITTED' ? 'green' : (detailData.status === 'REJECTED' ? 'red' : 'orange')" class="font-weight-bold text-uppercase">
-         {{ detailData.status.replace('_', ' ') || 'UNKNOWN' }}
+        <v-chip size="x-small" variant="flat" :color="detailData.status === 'SUBMITTED' ? 'orange' : (detailData.status === 'REJECTED' ? 'red' : (detailData.status === 'PAID' ? 'green' : 'blue'))" class="font-weight-bold text-uppercase">
+         {{ detailData.status === 'SUBMITTED' ? 'WAITING PAYMENT' : detailData.status.replace('_', ' ') || 'UNKNOWN' }}
         </v-chip>
        </div>
       </v-col>
@@ -888,6 +1023,30 @@ onMounted(() => {
        </div>
       </v-card>
      </div>
+     
+     <div v-if="detailData.status === 'PAID' && detailData.paymentFiles?.length" class="mt-4">
+        <div class="text-subtitle-2 font-weight-bold mb-2 d-flex align-center text-success">
+            <v-icon start color="success" size="x-small">mdi-file-check</v-icon>
+            Bukti Pembayaran (PAID)
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <v-btn
+                v-for="(file, i) in detailData.paymentFiles"
+                :key="i"
+                :href="file.url"
+                target="_blank"
+                variant="outlined"
+                size="small"
+                color="success"
+                prepend-icon="mdi-download"
+                class="text-caption text-none"
+            >
+                {{ file.name.length > 30 ? file.name.substring(0, 27) + '...' : file.name }}
+            </v-btn>
+        </div>
+     </div>
+
+
     </div>
    </v-card-text>
    
@@ -901,11 +1060,98 @@ onMounted(() => {
      <CheckIcon size="16" class="mr-1"/> Approve & Send
     </v-btn>
    </v-card-actions>
+   <v-card-actions v-else-if="detailData.status === 'SUBMITTED'" class="bg-white pa-3 justify-end">
+    <v-btn color="success" variant="flat" size="small" @click="openPaymentModal(detailData)" class="px-4 text-caption">
+     <WalletIcon size="16" class="mr-1"/> Input Payment
+    </v-btn>
+    <v-btn variant="outlined" color="primary" size="small" @click="dialogDetail = false" class="px-4 text-caption">Close Detail</v-btn>
+   </v-card-actions>
    <v-card-actions v-else class="bg-white pa-3 justify-end">
     <v-btn variant="outlined" color="primary" size="small" @click="dialogDetail = false" class="px-4 text-caption">Close Detail</v-btn>
    </v-card-actions>
   </v-card>
  </v-dialog>
+
+  <v-dialog v-model="dialogPayment" max-width="500" persistent>
+    <v-card class="rounded-lg overflow-hidden small-dialog-card">
+      <div class="bg-gradient-smooth px-4 py-3 d-flex justify-space-between align-center">
+        <div class="d-flex align-center gap-2">
+          <div class="bg-white rounded-circle pa-1 d-flex">
+            <WalletIcon size="16" class="text-primary" />
+          </div>
+          <span class="text-subtitle-1 font-weight-bold text-white">Input Pembayaran Invoice</span>
+        </div>
+        <v-btn icon variant="text" color="white" size="small" @click="dialogPayment = false">
+          <XIcon size="18" />
+        </v-btn>
+      </div>
+      
+      <v-card-text class="pa-4 bg-grey-lighten-5">
+        <v-row dense>
+          <v-col cols="12" class="py-1">
+            <div class="text-caption text-medium-emphasis">ID Invoice Lokal: <strong>#{{ paymentForm.invoiceId }}</strong></div>
+            <v-alert density="compact" type="info" variant="tonal" class="my-2 text-caption">
+                Pencatatan ini hanya berlaku di sistem lokal (status PAID). Tidak ada pengiriman data ke Accurate.
+            </v-alert>
+          </v-col>
+          <v-col cols="12" md="6" class="py-1">
+            <v-text-field 
+                v-model.number="paymentForm.paidAmount" 
+                type="number" 
+                label="Jumlah Dibayar (Net Balance)" 
+                variant="outlined" 
+                density="compact"
+                hide-details
+                prefix="Rp"
+                class="small-input text-right-input"
+            ></v-text-field>
+          </v-col>
+          <v-col cols="12" md="6" class="py-1">
+            <v-text-field 
+                v-model="paymentForm.paidDate" 
+                type="date" 
+                label="Tanggal Pembayaran" 
+                variant="outlined" 
+                density="compact"
+                hide-details
+                class="small-input"
+            ></v-text-field>
+          </v-col>
+          <v-col cols="12" class="py-1">
+            <v-textarea 
+                v-model="paymentForm.note" 
+                label="Catatan Pembayaran (Opsional)" 
+                rows="2" 
+                density="compact" 
+                variant="outlined" 
+                hide-details
+                class="small-input small-textarea"
+            ></v-textarea>
+          </v-col>
+          <v-col cols="12" class="py-1">
+            <v-file-input 
+              v-model="paymentForm.files" 
+              label="Upload Bukti Pembayaran (Wajib)" 
+              multiple 
+              density="compact" 
+              variant="outlined" 
+              bg-color="white"
+              prepend-icon=""
+              prepend-inner-icon="mdi-paperclip"
+              class="small-input small-file-input"
+            ></v-file-input>
+          </v-col>
+        </v-row>
+      </v-card-text>
+      
+      <v-card-actions class="bg-white pa-3 justify-end border-top">
+        <v-btn variant="outlined" color="secondary" size="small" @click="dialogPayment = false" class="px-4 text-caption">Batal</v-btn>
+        <v-btn color="success" variant="flat" size="small" @click="handlePaymentSubmit" :loading="updatingPayment" class="px-4 text-caption">
+          <CheckIcon size="16" class="mr-1"/> Tandai PAID
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 
  <v-snackbar v-model="snackbar.show" :color="snackbar.color" location="top right" variant="elevated" timeout="3000">
   <div class="d-flex align-center text-caption">
@@ -955,7 +1201,7 @@ onMounted(() => {
  cursor: pointer;
 }
 .hover-row:hover {
- background-color: #e3f2fd !important; /* Warna biru muda saat hover untuk item yang bisa diklik */
+ background-color: #e3f2fd !important; 
 }
 .item-name-link {
  cursor: pointer;
@@ -980,7 +1226,7 @@ onMounted(() => {
  padding-bottom: 6px !important;
  min-height: 50px !important;
 }
-.tiny-input { width: 100%; max-width: 100px; } /* Diubah agar lebih responsif */
+.tiny-input { width: 100%; max-width: 100px; } 
 .tiny-input :deep(.v-field) {
  min-height: 36px !important;
  padding-top: 4px !important;
@@ -1001,10 +1247,10 @@ onMounted(() => {
 /* Data table custom styling */
 .compact-data-table :deep(.v-data-table__td) {
  font-size: 0.75rem !important;
- height: 38px !important; /* Dikecilkan */
+ height: 38px !important; 
 }
 .compact-data-table :deep(.v-data-table-header) th {
- height: 35px !important; /* Dikecilkan */
+ height: 35px !important; 
 }
 .compact-data-table :deep(.v-data-table-header) th.text-start {
  text-align: left !important;
@@ -1020,5 +1266,67 @@ onMounted(() => {
 .compact-detail-table :deep(td), .compact-detail-table :deep(th) {
  padding: 6px 8px !important;
  font-size: 0.75rem !important;
+}
+/* File Input (in modal) */
+.small-file-input :deep(.v-field) { 
+    min-height: 36px !important; 
+}
+.small-file-input :deep(.v-field__input) {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+}
+.small-file-input :deep(.v-field__input) div {
+    font-size: 0.75rem !important; 
+}
+.small-file-input :deep(.v-field-label--floating) { 
+    font-size: 0.7rem; 
+    transform: translateY(-100%) scale(0.75); 
+}
+.small-input :deep(.v-field__prepend-inner),
+.small-input :deep(.v-field__append-inner) {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+}
+
+.small-input-in-table :deep(.v-field) {
+    min-height: 32px !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+}
+.small-input-in-table :deep(.v-field__input) {
+    font-size: 0.75rem !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+    min-height: 20px !important;
+    height: 20px !important;
+}
+
+.small-select :deep(.v-field) {
+    min-height: 32px !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+}
+.small-select :deep(.v-field__input) { 
+    font-size: 0.75rem !important; 
+    padding-top: 2px !important; 
+    padding-bottom: 2px !important; 
+}
+
+.small-search-input :deep(.v-field) {
+    min-height: 36px !important;
+}
+.small-search-input :deep(.v-field__input) {
+    font-size: 0.8rem;
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+    min-height: 30px !important;
+    height: 30px !important;
+}
+.small-search-input :deep(.v-label) {
+    font-size: 0.8rem;
+    top: 6px;
+}
+.small-search-input :deep(.v-field__prepend-inner) {
+    margin-top: 2px;
 }
 </style>

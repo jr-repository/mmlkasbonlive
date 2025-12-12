@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// FIX: Tambahkan onBeforeUnmount
 import { ref, reactive, onMounted, computed, watch, onBeforeUnmount } from 'vue'; 
 import { format, subMonths } from 'date-fns';
 import { useAuthStore } from '@/stores/auth'; 
@@ -22,21 +21,19 @@ import {
   CurrencyDollarIcon,
   ReceiptIcon,
   ChartPieIcon,
-  ListIcon
+  ListIcon,
+  FileSpreadsheetIcon,
+  FileAnalyticsIcon
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
 const authStore = useAuthStore();
 
-// FIX: Deklarasi timer untuk debounce search dan filter
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 let filterTimeout: ReturnType<typeof setTimeout> | null = null;
 
-// --- STATE TABS & LAYOUT ---
 const activeTab = ref('summary');
 
-// --- STATE FILTER & DASHBOARD ---
-// Default 1 Bulan Terakhir
 const filterDate = reactive({
   start: format(subMonths(new Date(), 1), 'yyyy-MM-dd'),
   end: format(new Date(), 'yyyy-MM-dd')
@@ -47,7 +44,6 @@ const dashboardData = ref({
   jo_performance: [] as any[]
 });
 
-// --- STATE LIST ---
 const loadingList = ref(false);
 const kasbonList = ref<any[]>([]);
 const search = ref('');
@@ -62,8 +58,7 @@ const headers = [
   { title: 'Actions', key: 'actions', align: 'center' as const, sortable: false },
 ];
 
-// --- STATE FORM (MODAL) ---
-const dialogForm = ref(false); // Modal Form
+const dialogForm = ref(false); 
 const isEditing = ref(false);
 const editId = ref(0);
 const form = reactive({
@@ -84,24 +79,25 @@ const form = reactive({
 });
 const saving = ref(false);
 
-// --- STATE DETAIL (MODAL) ---
 const dialogDetail = ref(false);
 const detailData = ref<any>(null);
 const loadingDetail = ref(false);
 const approving = ref(false);
 const rejecting = ref(false);
 
+const dialogJODetail = ref(false);
+const joDetailData = ref<any>(null);
+const loadingJoDetail = ref(false);
+
 const snackbar = reactive({ show: false, text: '', color: 'success' });
 const showMsg = (text: string, color = 'success') => {
   snackbar.text = text; snackbar.color = color; snackbar.show = true;
 };
 
-// --- COMPUTED ---
 const totalAmount = computed(() => form.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0));
 const totalBill = computed(() => form.items.reduce((sum, item) => sum + (Number(item.billAmount) || 0), 0));
 const canApprove = computed(() => authStore.userData?.approvals?.includes('KASBON'));
 
-// --- METHODS: DASHBOARD & EXPORT ---
 const fetchDashboard = async () => {
   try {
     const url = `${API_BASE_URL}/Kasbon/DashboardSummary.php?start_date=${filterDate.start}&end_date=${filterDate.end}`;
@@ -118,11 +114,9 @@ const handleExport = (type: 'excel' | 'pdf') => {
   window.open(url, '_blank');
 };
 
-// --- METHODS: LIST ---
 const fetchList = async () => {
   loadingList.value = true;
   try {
-    // FIX: Hapus fetchDashboard() dari sini. Dashboard akan refresh via watch filter.
     const url = new URL(`${API_BASE_URL}/Kasbon/List.php`);
     if (search.value) url.searchParams.append("q", search.value);
     
@@ -140,26 +134,20 @@ const fetchList = async () => {
   }
 };
 
-// FIX: Tambahkan debounce function untuk search
 const fetchListDebounced = () => {
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(fetchList, 600);
 };
 
-// FIX: Tambahkan debounce function untuk filter date
 const fetchDashboardDebounced = () => {
   if (filterTimeout) clearTimeout(filterTimeout);
-  filterTimeout = setTimeout(fetchDashboard, 600); // FIX: Debounce 600ms untuk filter
+  filterTimeout = setTimeout(fetchDashboard, 600);
 };
 
-// FIX: Gunakan watch dengan debounce function
 watch(search, fetchListDebounced);
 
-// FIX: Gunakan watch dengan debounce function
 watch(() => [filterDate.start, filterDate.end], fetchDashboardDebounced, { deep: true });
 
-
-// --- METHODS: FORM ---
 const openCreateModal = () => {
   resetForm();
   dialogForm.value = true;
@@ -174,7 +162,6 @@ const removeItem = (idx: number) => {
 };
 
 const onItemChange = (idx: number, obj: any) => {
-  // FIX: Pastikan accountNo terisi dari AsyncSelect
   if (obj) {
     form.items[idx].accountNo = obj.no;
     form.items[idx].accountName = obj.name;
@@ -207,7 +194,6 @@ const handleEdit = async (item: any) => {
       const data = json.d;
       isEditing.value = true;
       editId.value = data.id;
-      // FIX: Pertahankan logic parsing tanggal
       const parts = data.transDate.split('/');
       form.transDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
       form.bankId = data.bank.id;
@@ -225,7 +211,7 @@ const handleEdit = async (item: any) => {
         notes: d.detailNotes
       }));
       
-      dialogForm.value = true; // Buka Modal
+      dialogForm.value = true;
       showMsg("Mode Edit Aktif", "info");
     }
   } catch {
@@ -244,6 +230,8 @@ const handleSubmit = async () => {
     const payload = {
       id: isEditing.value ? editId.value : null, 
       user: authStore.userData?.name || 'User',
+      user_id: authStore.userData?.id,
+      user_name: authStore.userData?.name,
       transDate: form.transDate,
       bankId: form.bankId,
       bankName: form.bankName,
@@ -270,8 +258,8 @@ const handleSubmit = async () => {
     const json = await res.json();
     if (json.s) {
       showMsg(isEditing.value ? 'Perubahan Disimpan' : 'Berhasil Disimpan');
-      dialogForm.value = false; // Tutup Modal
-      fetchList(); // FIX: Panggil fetchList untuk refresh list
+      dialogForm.value = false; 
+      fetchList(); 
     } else {
       showMsg(json.message || 'Gagal simpan', 'error');
     }
@@ -345,12 +333,35 @@ const openDetail = async (id: number) => {
   }
 };
 
+const openJoDetail = async (joNumber: string) => {
+  dialogJODetail.value = true;
+  loadingJoDetail.value = true;
+  joDetailData.value = null;
+  try {
+    const res = await fetch(`${API_BASE_URL}/Kasbon/GetJoExpenses.php?jo_number=${joNumber}`);
+    const json = await res.json();
+    if(json.s) joDetailData.value = json.d;
+    else showMsg('Data JO detail tidak ditemukan', 'error');
+  } catch {
+    showMsg('Error koneksi', 'error');
+  } finally {
+    loadingJoDetail.value = false;
+  }
+};
+
+const printJoPdf = (joNumber: string) => {
+  window.open(`${API_BASE_URL}/Kasbon/ExportJoPdf.php?jo_number=${joNumber}`, '_blank');
+};
+
+const exportJoExcel = (joNumber: string) => {
+  window.open(`${API_BASE_URL}/Kasbon/ExportJoExcel.php?jo_number=${joNumber}`, '_blank');
+};
+
 onMounted(() => {
   fetchList();
-  fetchDashboardDebounced(); // FIX: Panggil dashboard data saat mounted
+  fetchDashboardDebounced();
 });
 
-// FIX: Bersihkan timeout saat komponen dilepas
 onBeforeUnmount(() => {
   if (searchTimeout) clearTimeout(searchTimeout);
   if (filterTimeout) clearTimeout(filterTimeout);
@@ -427,10 +438,7 @@ onBeforeUnmount(() => {
                 </div>
 
                 <v-btn color="white" variant="outlined" class="text-white border-white text-caption" size="x-small" @click="handleExport('excel')">
-                  <DownloadIcon size="16" class="mr-1"/> Excel
-                </v-btn>
-                <v-btn color="white" variant="outlined" class="text-white border-white text-caption" size="x-small" @click="handleExport('pdf')">
-                  <PrinterIcon size="16" class="mr-1"/> Print
+                  <DownloadIcon size="16" class="mr-1"/> All
                 </v-btn>
               </div>
             </div>
@@ -444,13 +452,14 @@ onBeforeUnmount(() => {
                   <th class="text-right text-caption">Total Tagihan</th>
                   <th class="text-right text-caption">Gross Profit</th>
                   <th class="text-center text-caption">Margin %</th>
+                  <th class="text-center text-caption">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="dashboardData.jo_performance.length === 0">
-                  <td colspan="6" class="text-center py-2 text-caption text-grey">Belum ada data pada periode ini</td>
+                  <td colspan="7" class="text-center py-2 text-caption text-grey">Belum ada data pada periode ini</td>
                 </tr>
-                <tr v-for="jo in dashboardData.jo_performance" :key="jo.jo_number" class="text-caption">
+                <tr v-for="jo in dashboardData.jo_performance" :key="jo.jo_number" class="text-caption hover-row">
                   <td class="font-weight-bold text-primary">{{ jo.jo_number }}</td>
                   <td>{{ jo.customer }}</td>
                   <td class="text-right text-red">Rp {{ Number(jo.cost).toLocaleString('id-ID') }}</td>
@@ -460,6 +469,19 @@ onBeforeUnmount(() => {
                     <v-chip size="x-small" :color="jo.margin > 20 ? 'green' : (jo.margin > 0 ? 'orange' : 'red')" variant="flat" class="text-uppercase font-weight-bold">
                       {{ jo.margin }}%
                     </v-chip>
+                  </td>
+                  <td class="text-center">
+                    <div class="d-flex justify-center gap-1">
+                      <v-btn icon variant="text" color="info" size="x-small" @click="openJoDetail(jo.jo_number)" title="View Expense Detail">
+                        <EyeIcon size="16"/>
+                      </v-btn>
+                      <v-btn icon variant="text" color="error" size="x-small" @click="printJoPdf(jo.jo_number)" title="Print PDF">
+                        <PrinterIcon size="16"/>
+                      </v-btn>
+                      <v-btn icon variant="text" color="success" size="x-small" @click="exportJoExcel(jo.jo_number)" title="Export Excel">
+                        <FileSpreadsheetIcon size="16"/>
+                      </v-btn>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -700,6 +722,87 @@ onBeforeUnmount(() => {
       </v-card-actions>
     </v-card>
   </v-dialog>
+
+  <v-dialog v-model="dialogJODetail" max-width="800" scrollable>
+    <v-card class="rounded-lg small-dialog-card">
+      <div class="bg-gradient-smooth px-4 py-3 d-flex justify-space-between align-center">
+        <div class="d-flex align-center">
+          <FileAnalyticsIcon size="20" class="text-white mr-2" />
+          <div>
+            <span class="text-subtitle-1 font-weight-bold text-white d-block">Expense History per Job Order</span>
+            <span class="text-caption text-white opacity-80" v-if="joDetailData">{{ joDetailData.jo_info.transaction_number }} - {{ joDetailData.jo_info.customer_name }}</span>
+          </div>
+        </div>
+        <v-btn icon variant="text" color="white" size="small" @click="dialogJODetail = false"><XIcon size="18"/></v-btn>
+      </div>
+      
+      <v-card-text class="pa-0 bg-grey-lighten-5 dialog-detail-content" style="max-height: 70vh;">
+        <div v-if="loadingJoDetail" class="text-center py-6">
+          <v-progress-circular indeterminate color="primary"></v-progress-circular>
+          <div class="text-caption mt-2">Loading details...</div>
+        </div>
+        
+        <div v-else-if="joDetailData">
+          <div class="pa-4">
+            <v-card variant="outlined" class="mb-4 bg-white">
+              <div class="d-flex justify-space-between pa-3 bg-grey-lighten-4 border-bottom">
+                 <span class="text-caption font-weight-bold">SUMMARY PROFITABILITY</span>
+              </div>
+              <v-row no-gutters class="pa-2">
+                <v-col cols="4" class="text-center border-e px-2">
+                  <div class="text-caption text-grey">Total Tagihan (Bill)</div>
+                  <div class="text-subtitle-2 font-weight-bold text-blue">Rp {{ Number(joDetailData.summary.total_bill).toLocaleString('id-ID') }}</div>
+                </v-col>
+                <v-col cols="4" class="text-center border-e px-2">
+                  <div class="text-caption text-grey">Total Biaya (Cost)</div>
+                  <div class="text-subtitle-2 font-weight-bold text-red">Rp {{ Number(joDetailData.summary.total_cost).toLocaleString('id-ID') }}</div>
+                </v-col>
+                <v-col cols="4" class="text-center px-2">
+                  <div class="text-caption text-grey">Gross Profit</div>
+                  <div class="text-subtitle-2 font-weight-bold text-green">Rp {{ Number(joDetailData.summary.gross_profit).toLocaleString('id-ID') }}</div>
+                </v-col>
+              </v-row>
+            </v-card>
+
+            <div class="text-caption font-weight-bold mb-2 ml-1 text-grey-darken-2">RINCIAN PENGELUARAN (EXPENSE LIST)</div>
+            <v-card variant="outlined" class="overflow-hidden border bg-white">
+              <v-table density="compact" class="compact-detail-table">
+                <thead class="bg-grey-lighten-4">
+                  <tr>
+                    <th class="text-center">Date</th>
+                    <th>Trans No</th>
+                    <th>Description</th>
+                    <th class="text-right">Cost Amount</th>
+                    <th class="text-right">Bill Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="joDetailData.expenses.length === 0">
+                    <td colspan="5" class="text-center text-caption text-grey py-4">Tidak ada data pengeluaran untuk JO ini</td>
+                  </tr>
+                  <tr v-for="(exp, i) in joDetailData.expenses" :key="i">
+                    <td class="text-center text-caption">{{ format(new Date(exp.trans_date), 'dd/MM/yyyy') }}</td>
+                    <td class="text-caption font-weight-medium">{{ exp.transaction_number }}</td>
+                    <td class="text-caption text-grey-darken-2">{{ exp.notes || '-' }}</td>
+                    <td class="text-right text-caption">Rp {{ Number(exp.cost).toLocaleString('id-ID') }}</td>
+                    <td class="text-right text-caption text-blue">Rp {{ Number(exp.bill).toLocaleString('id-ID') }}</td>
+                  </tr>
+                </tbody>
+              </v-table>
+            </v-card>
+          </div>
+        </div>
+      </v-card-text>
+      
+      <v-divider></v-divider>
+      <v-card-actions class="bg-white pa-3 justify-end">
+        <v-btn variant="outlined" color="primary" size="small" @click="dialogJODetail = false" class="text-caption">Close</v-btn>
+        <v-btn color="error" variant="flat" size="small" @click="printJoPdf(joDetailData?.jo_info.transaction_number)" :disabled="!joDetailData" class="text-caption ml-2">
+           <PrinterIcon size="16" class="mr-1"/> Print PDF
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <style scoped>
@@ -711,7 +814,6 @@ onBeforeUnmount(() => {
 .border-green { border-left: 3px solid #66bb6a; }
 .border-white { border-color: rgba(255,255,255,0.7) !important; }
 
-/* Global overrides for small components/elements */
 .compact-header-card :deep(.text-h6) { font-size: 1rem !important; }
 .compact-tab :deep(.v-tab__content) { font-size: 0.75rem !important; }
 
@@ -719,12 +821,10 @@ onBeforeUnmount(() => {
 .compact-summary-card :deep(.text-caption) { font-size: 0.65rem !important; }
 .compact-summary-card :deep(.v-icon) { font-size: 18px; }
 
-/* Custom border for date filter */
 .border-filter-date {
     border: 1px solid #ddd;
 }
 
-/* Data Table Styling */
 .compact-data-table :deep(.v-data-table-header) th {
     height: 35px !important;
 }
@@ -741,9 +841,7 @@ onBeforeUnmount(() => {
     padding: 6px 8px !important;
 }
 
-/* Search Input Styling */
 .search-border-fix {
-    /* Menambahkan border pada input field search */
     border: 1px solid rgba(0,0,0,0.12); 
     border-radius: 4px;
 }
@@ -769,13 +867,11 @@ onBeforeUnmount(() => {
     padding-right: 0 !important;
 }
 
-/* Form Input & Textarea */
 .small-input :deep(.v-field) { min-height: 36px !important; }
 .small-input :deep(.v-label) { font-size: 0.8rem; }
 .small-input :deep(input) { font-size: 0.85rem; }
 .small-textarea :deep(.v-field__input) { padding-top: 6px !important; padding-bottom: 6px !important; min-height: 50px !important; }
 
-/* Form Table Input (Sangat Compact) */
 .small-input-in-table :deep(.v-field) {
     min-height: 32px !important;
     padding-top: 2px !important;
@@ -798,9 +894,9 @@ onBeforeUnmount(() => {
     padding: 4px 8px !important;
 }
 
-/* Detail Modal */
 .text-xsmall { font-size: 0.65rem !important; }
 .dialog-detail-content { font-size: 0.75rem; }
 .dialog-detail-content :deep(.v-table td) { padding: 4px 8px !important; }
 .dialog-detail-content :deep(.v-table th) { padding: 6px 8px !important; }
+.hover-row:hover { background-color: #f5f5f5; }
 </style>

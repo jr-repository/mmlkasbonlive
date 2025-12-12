@@ -8,7 +8,8 @@ import {
     ChartBarIcon,
     UsersIcon,
     SettingsIcon,
-    ShieldCheckIcon // Icon Baru
+    ShieldCheckIcon,
+    ActivityIcon // Icon Baru
 } from 'vue-tabler-icons';
 
 export interface menu {
@@ -76,10 +77,26 @@ const sidebarItem: menu[] = [
         icon: ChartBarIcon,
         to: '/laporan'
     },
+    // --- MENU BARU ---
+    {
+        title: 'Aktivitas User',
+        icon: ActivityIcon,
+        to: '/report/user-activity'
+    },
+    // ----------------
     {
         title: 'Rekonsiliasi Bank',
         icon: ArrowsLeftRightIcon,
-        to: '/rekon'
+        children: [
+            {
+                title: 'Mandiri',
+                to: '/rekon'
+            },
+            {
+                title: 'CIMB Niaga',
+                to: '/rekon/cimb'
+            }
+        ]
     },
 
     // --- Kategori: Master Data ---

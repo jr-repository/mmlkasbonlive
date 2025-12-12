@@ -201,8 +201,15 @@ if(form.items.some(i => !i.itemNo)) return showMsg("Ada Item yang belum dipilih"
 
 saving.value = true;
 try {
+ // Insert User Data
+ const payload = {
+    ...form,
+    user_id: authStore.userData?.id,
+    user_name: authStore.userData?.name
+ };
+
  const res = await fetch(`${API_BASE_URL}/Bill/Transaksi.php`, {
- method: 'POST', body: JSON.stringify(form)
+ method: 'POST', body: JSON.stringify(payload)
  });
  const json = await res.json();
  if(json.s) {

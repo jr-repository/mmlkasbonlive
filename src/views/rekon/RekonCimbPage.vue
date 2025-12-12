@@ -11,18 +11,19 @@ import {
   RefreshIcon, 
   EyeIcon,
   ArrowDownCircleIcon,
-  FileTextIcon,
   CheckIcon,
   XIcon,
   PlusIcon,
-  CalendarIcon 
+  CalendarIcon
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
 const router = useRouter();
 const authStore = useAuthStore();
 const fileInput = ref<HTMLInputElement | null>(null);
-const currentUser = authStore.user;
+const currentUser = authStore.userData;
+// [FIX] Tambahkan ref untuk form validation
+const createFormRef = ref<any>(null);
 
 const loading = ref(false);
 const list = ref<any[]>([]);
@@ -43,28 +44,42 @@ const submitting = ref(false);
 const createModalOpen = ref(false);
 const creating = ref(false);
 const createForm = reactive({
-  account_no: '',
-  date: new Date().toISOString().substr(0, 10),
-  val_date: new Date().toISOString().substr(0, 10),
-  transaction_code: '',
-  description1: '',
-  description2: '',
-  reference_no: '',
+  line_no: 0,
+  post_date: new Date().toISOString().substr(0, 10),
+  eff_date: new Date().toISOString().substr(0, 10),
+  cheque_no: '',
+  description: '',
   debit: 0,
-  credit: 0
+  credit: 0,
+  balance: 0,
+  transaction_code: '',
+  reference_no: '',
+  payment_type: '',
+  bank_reference: ''
 });
+
+const deleteDialog = ref(false);
+const itemToDelete = ref<any>(null);
 
 const snackbar = reactive({ show: false, text: '', color: 'success' });
 const showMsg = (text: string, color = 'success') => { snackbar.text = text; snackbar.color = color; snackbar.show = true; };
 
+const requiredRule = [(v: any) => !!v || 'Field ini wajib diisi'];
+const requiredDateRule = [(v: any) => !!v || 'Tanggal wajib diisi'];
+
 const headers = [
-  { title: 'Date', key: 'date', align: 'start' as const, width: '120px' },
+  { title: 'Post Date', key: 'post_date', align: 'start' as const, width: '120px' },
   { title: 'Trx Code', key: 'transaction_code', align: 'start' as const, width: '150px' },
-  { title: 'Account', key: 'account_no', align: 'start' as const, width: '150px' },
-  { title: 'Description', key: 'description1', align: 'start' as const, width: '400px' },
+  { title: 'Cheque No', key: 'cheque_no', align: 'start' as const, width: '100px' },
+  { title: 'Description', key: 'description', align: 'start' as const, width: '300px' },
   { title: 'Debit', key: 'debit', align: 'end' as const, width: '120px' },
   { title: 'Credit', key: 'credit', align: 'end' as const, width: '120px' },
+  { title: 'Balance', key: 'balance', align: 'end' as const, width: '120px' },
+  { title: 'Ref no', key: 'reference_no', align: 'start' as const, width: '100px' },
+  { title: 'Pymt Type', key: 'payment_type', align: 'start' as const, width: '120px' },
+  { title: 'Bank Ref', key: 'bank_reference', align: 'start' as const, width: '120px' },
   { title: 'Status', key: 'status', align: 'center' as const, width: '80px' },
+  // [FIX] Menambahkan created_by dan updater_name
   { title: 'Created By', key: 'creator_name', align: 'start' as const, width: '100px' },
   { title: 'Approved By', key: 'updater_name', align: 'start' as const, width: '100px' },
   { title: 'Action', key: 'actions', align: 'center' as const, sortable: false, width: '100px' },
@@ -81,23 +96,18 @@ const fetchData = async () => {
         from_date: filterDate.from,
         to_date: filterDate.to
     });
-    // Fetch List
-    const resList = await fetch(`${API_BASE_URL}/Rekon/List.php?${params.toString()}`);
+
+    const resList = await fetch(`${API_BASE_URL}/Rekon/ListCimb.php?${params.toString()}`);
     const jsonList = await resList.json();
-    if(jsonList.s) list.value = jsonList.d.map((item:any) => ({
-      ...item,
-      debit: parseFloat(item.debit),
-      credit: parseFloat(item.credit)
-    }));
+    if(jsonList.s) list.value = jsonList.d;
     else list.value = []; 
 
-    // Fetch Dashboard Stats
-    const resStats = await fetch(`${API_BASE_URL}/Rekon/Dashboard.php`);
+    const resStats = await fetch(`${API_BASE_URL}/Rekon/DashboardCimb.php`);
     const jsonStats = await resStats.json();
     if(jsonStats.s) stats.value = jsonStats.d;
     else stats.value = null; 
   } catch (e) {
-    showMsg("Gagal memuat data rekonsiliasi.", "error"); 
+    showMsg("Gagal memuat data CIMB.", "error"); 
     console.error(e);
   } finally {
     loading.value = false;
@@ -126,13 +136,13 @@ const handleFileChange = async (e: Event) => {
 
   importing.value = true;
   try {
-    const res = await fetch(`${API_BASE_URL}/Rekon/Import.php`, { method: "POST", body: formData });
+    const res = await fetch(`${API_BASE_URL}/Rekon/ImportCimb.php`, { method: "POST", body: formData });
     const json = await res.json();
     if (json.s) {
       showMsg(json.message, "success");
       fetchData();
     } else {
-      showMsg(json.message || "Gagal melakukan import.", "error");
+      showMsg(json.message || "Gagal melakukan import CIMB.", "error");
     }
   } catch {
     showMsg("Gagal upload file. Periksa koneksi atau format file.", "error");
@@ -143,7 +153,7 @@ const handleFileChange = async (e: Event) => {
 };
 
 const downloadTemplate = () => {
-  window.location.href = `${API_BASE_URL}/Rekon/DownloadTemplate.php`;
+  window.location.href = `${API_BASE_URL}/Rekon/DownloadTemplateCimb.php`;
 };
 
 const exportData = () => {
@@ -151,25 +161,32 @@ const exportData = () => {
         from_date: filterDate.from,
         to_date: filterDate.to
     });
-    window.location.href = `${API_BASE_URL}/Rekon/ExportExcel.php?${params.toString()}`;
+    window.location.href = `${API_BASE_URL}/Rekon/ExportExcelCimb.php?${params.toString()}`;
 };
 
 const openCreateModal = () => {
-  createForm.account_no = '';
-  createForm.date = new Date().toISOString().substr(0, 10);
-  createForm.val_date = new Date().toISOString().substr(0, 10);
-  createForm.transaction_code = '';
-  createForm.description1 = '';
-  createForm.description2 = '';
-  createForm.reference_no = '';
-  createForm.debit = 0;
-  createForm.credit = 0;
+  Object.assign(createForm, {
+    line_no: 0,
+    post_date: new Date().toISOString().substr(0, 10),
+    eff_date: new Date().toISOString().substr(0, 10),
+    cheque_no: '',
+    description: '',
+    debit: 0,
+    credit: 0,
+    balance: 0,
+    transaction_code: '',
+    reference_no: '',
+    payment_type: '',
+    bank_reference: ''
+  });
   createModalOpen.value = true;
 };
 
 const handleCreateSubmit = async () => {
-  if(!createForm.account_no || !createForm.transaction_code) {
-    showMsg("Account No dan Trx Code wajib diisi", "error");
+  // [FIX] Validasi Form
+  const { valid } = await createFormRef.value.validate();
+  if (!valid) {
+    showMsg("Harap lengkapi semua field wajib (*)", "error");
     return;
   }
   
@@ -177,10 +194,11 @@ const handleCreateSubmit = async () => {
   try {
     const payload = {
       ...createForm,
-      created_by: currentUser?.id
+      // Penting: Pastikan ID user dikirim. Jika null, kirim 0.
+      created_by: currentUser?.id || 0
     };
     
-    const res = await fetch(`${API_BASE_URL}/Rekon/Create.php`, {
+    const res = await fetch(`${API_BASE_URL}/Rekon/CreateCimb.php`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -188,14 +206,15 @@ const handleCreateSubmit = async () => {
     const json = await res.json();
 
     if(json.s) {
-      showMsg("Transaksi berhasil ditambahkan", "success");
+      showMsg("Transaksi CIMB berhasil ditambahkan", "success");
       createModalOpen.value = false;
       fetchData();
     } else {
-      showMsg(json.message || "Gagal menyimpan", "error");
+      showMsg(json.message || "Gagal menyimpan transaksi CIMB", "error");
     }
   } catch(e) {
-    showMsg("Terjadi kesalahan koneksi saat menyimpan manual.", "error");
+    // [FIX] Mengubah error message agar lebih informatif
+    showMsg("Terjadi kesalahan koneksi server. Cek log server atau pastikan API CreateCimb.php berjalan normal.", "error");
   } finally {
     creating.value = false;
   }
@@ -223,14 +242,14 @@ const handleActionSubmit = async () => {
   uploadFiles.value.forEach((file) => formData.append("files[]", file));
 
   try {
-    const res = await fetch(`${API_BASE_URL}/Rekon/Action.php`, { method: "POST", body: formData });
+    const res = await fetch(`${API_BASE_URL}/Rekon/ActionCimb.php`, { method: "POST", body: formData });
     const json = await res.json();
     if (json.s) {
-      showMsg("Status berhasil diperbarui.", "success");
+      showMsg("Status CIMB berhasil diperbarui.", "success");
       modalOpen.value = false;
       fetchData();
     } else {
-      showMsg(json.message || "Gagal memperbarui status.", "error");
+      showMsg(json.message || "Gagal memperbarui status CIMB.", "error");
     }
   } catch {
     showMsg("Terjadi kesalahan koneksi saat update status.", "error");
@@ -239,7 +258,44 @@ const handleActionSubmit = async () => {
   }
 };
 
+const openDeleteDialog = (item: any) => {
+    itemToDelete.value = item;
+    deleteDialog.value = true;
+};
+
+const handleDelete = async () => {
+    if (!itemToDelete.value) return;
+    try {
+        const res = await fetch(`${API_BASE_URL}/Rekon/DeleteCimb.php`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: itemToDelete.value.id })
+        });
+        const json = await res.json();
+        
+        if (json.s) {
+            showMsg(json.message, "success");
+            deleteDialog.value = false;
+            fetchData();
+        } else {
+            showMsg(json.message || "Gagal menghapus data.", "error");
+        }
+    } catch (e: any) {
+        showMsg(e.message || "Gagal menghapus", "error");
+    }
+};
+
 const fmtMoney = (val: number) => val ? val.toLocaleString('id-ID') : '-';
+const fmtDate = (val: string) => {
+    if (!val) return '-';
+    // Format YYYY-MM-DD HH:MM:SS ke DD/MM/YYYY
+    const datePart = val.split(' ')[0];
+    const parts = datePart.split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return val;
+};
 
 onMounted(fetchData);
 
@@ -251,18 +307,18 @@ onBeforeUnmount(() => {
 <template>
   <v-row class="mt-0">
     
-            <v-col cols="12" class="d-flex flex-wrap align-center justify-space-between gap-2 py-2">
+    <v-col cols="12" class="d-flex flex-wrap align-center justify-space-between gap-2 py-2">
       <div>
-        <h2 class="text-h6 font-weight-bold">Rekonsiliasi Bank Mandiri</h2>
-        <div class="text-caption text-grey">Kelola dan cocokkan transaksi bank internal</div>
+        <h2 class="text-h6 font-weight-bold">Rekonsiliasi Bank CIMB Niaga</h2>
+        <div class="text-caption text-grey">Kelola dan cocokkan transaksi bank CIMB Niaga</div>
       </div>
       <div class="d-flex gap-2 align-center">
-     
+      
         <v-btn variant="outlined" color="success" @click="exportData" size="small" class="text-caption">
           <DownloadIcon size="16" class="mr-1" /> Export Data
         </v-btn>
         <v-btn variant="outlined" color="primary" @click="downloadTemplate" size="small" class="text-caption">
-          <DownloadIcon size="16" class="mr-1" /> Template
+          <DownloadIcon size="16" class="mr-1" /> Template CIMB
         </v-btn>
         
         <input type="file" accept=".xlsx, .csv" ref="fileInput" class="d-none" @change="handleFileChange" />
@@ -276,7 +332,7 @@ onBeforeUnmount(() => {
       </div>
     </v-col>
 
-            <v-col cols="12" sm="6" md="3" class="py-1">
+    <v-col cols="12" sm="6" md="3" class="py-1">
       <v-card variant="outlined" class="pa-3 compact-summary-card">
         <div class="d-flex justify-space-between align-center">
           <div>
@@ -310,9 +366,8 @@ onBeforeUnmount(() => {
         <div class="text-h6 font-weight-bold text-green-darken-4">{{ stats?.status_counts.Approved || 0 }}</div>
       </v-card>
     </v-col>
-
-            <v-col cols="12" class="py-1">
-      <UiParentCard title="Daftar Transaksi" class="compact-card">
+    <v-col cols="12" class="py-1">
+      <UiParentCard title="Daftar Transaksi CIMB Niaga" class="compact-card">
         <div class="d-flex flex-wrap gap-2 mb-2 align-center">
           <div style="flex: 1; min-width: 200px;">
             <v-text-field
@@ -359,7 +414,7 @@ onBeforeUnmount(() => {
               </template>
             </v-text-field>
           </div>
-          
+
           <div style="width: 150px;">
             <v-select
               v-model="filterStatus"
@@ -383,18 +438,22 @@ onBeforeUnmount(() => {
               :loading="loading"
               density="compact"
               class="border rounded-md compact-datatable"
+              :items-per-page="50"
               fixed-header
-              style="min-width: 1400px;" 
+              style="min-width: 1500px;" 
             >
+              <template v-slot:item.post_date="{ item }">
+                <span class="text-caption">{{ fmtDate(item.post_date) }}</span>
+              </template>
               <template v-slot:item.transaction_code="{ item }">
                 <span class="font-weight-medium font-mono text-primary text-caption">{{ item.transaction_code }}</span>
               </template>
-              <template v-slot:item.account_no="{ item }">
-                            <span class="text-caption">{{ item.account_no }}</span>
-                        </template>
-                        <template v-slot:item.description1="{ item }">
-                            <span class="text-caption">{{ item.description1.length > 50 ? item.description1.substring(0, 50) + '...' : item.description1 }}</span>
-                        </template>
+              <template v-slot:item.cheque_no="{ item }">
+                <span class="text-caption">{{ item.cheque_no || '-' }}</span>
+              </template>
+              <template v-slot:item.description="{ item }">
+                <span class="text-caption">{{ item.description.length > 50 ? item.description.substring(0, 50) + '...' : item.description }}</span>
+              </template>
               <template v-slot:item.debit="{ item }">
                 <span v-if="item.debit > 0" class="text-green font-weight-bold text-caption">{{ fmtMoney(item.debit) }}</span>
                 <span v-else class="text-caption">-</span>
@@ -402,6 +461,18 @@ onBeforeUnmount(() => {
               <template v-slot:item.credit="{ item }">
                 <span v-if="item.credit > 0" class="text-red font-weight-bold text-caption">{{ fmtMoney(item.credit) }}</span>
                 <span v-else class="text-caption">-</span>
+              </template>
+              <template v-slot:item.balance="{ item }">
+                <span class="font-weight-bold text-caption">{{ fmtMoney(item.balance) }}</span>
+              </template>
+              <template v-slot:item.reference_no="{ item }">
+                <span class="text-caption">{{ item.reference_no || '-' }}</span>
+              </template>
+              <template v-slot:item.payment_type="{ item }">
+                <span class="text-caption">{{ item.payment_type || '-' }}</span>
+              </template>
+              <template v-slot:item.bank_reference="{ item }">
+                <span class="text-caption">{{ item.bank_reference || '-' }}</span>
               </template>
               <template v-slot:item.status="{ item }">
                 <v-chip 
@@ -412,10 +483,11 @@ onBeforeUnmount(() => {
                   {{ item.status }}
                 </v-chip>
               </template>
-
+              
               <template v-slot:item.creator_name="{ item }">
                 <span class="text-caption">{{ item.creator_name || '-' }}</span>
               </template>
+              
               <template v-slot:item.updater_name="{ item }">
                 <span class="text-caption" :class="{'text-success font-weight-bold': item.status === 'Approved', 'text-red font-weight-bold': item.status === 'Rejected'}">
                   {{ item.updater_name && item.status !== 'New' ? item.updater_name : '-' }}
@@ -423,17 +495,22 @@ onBeforeUnmount(() => {
               </template>
               
               <template v-slot:item.actions="{ item }">
-                <div v-if="item.status === 'New'" class="d-inline-flex">
-                  <v-btn icon variant="text" size="x-small" color="success" @click="openModal(item, 'Approved')" title="Approve">
-                    <CheckIcon size="16" />
-                  </v-btn>
-                  <v-btn icon variant="text" size="x-small" color="error" @click="openModal(item, 'Rejected')" title="Reject">
-                    <XIcon size="16" />
+                <div class="d-inline-flex">
+                  <template v-if="item.status === 'New'">
+                    <v-btn icon variant="text" size="x-small" color="success" @click="openModal(item, 'Approved')" title="Approve">
+                      <CheckIcon size="16" />
+                    </v-btn>
+                    <v-btn icon variant="text" size="x-small" color="error" @click="openModal(item, 'Rejected')" title="Reject">
+                      <XIcon size="16" />
+                    </v-btn>
+                    <v-btn icon variant="text" size="x-small" color="error" @click="openDeleteDialog(item)" title="Hapus">
+                        <XIcon size="16" />
+                    </v-btn>
+                  </template>
+                  <v-btn v-else icon variant="text" size="x-small" color="primary" @click="openModal(item)">
+                    <EyeIcon size="16" />
                   </v-btn>
                 </div>
-                <v-btn v-else icon variant="text" size="x-small" color="primary" @click="openModal(item)">
-                  <EyeIcon size="16" />
-                </v-btn>
               </template>
 
             </v-data-table>
@@ -442,59 +519,74 @@ onBeforeUnmount(() => {
     </v-col>
   </v-row>
 
-    <v-dialog v-model="createModalOpen" max-width="600" persistent>
+  <v-dialog v-model="createModalOpen" max-width="700" persistent>
     <v-card class="rounded-lg small-dialog-card">
       <v-card-title class="bg-primary text-white d-flex justify-space-between align-center px-4 py-3 text-subtitle-1">
-        Input Transaksi Baru
+        Input Transaksi CIMB Baru
         <v-btn icon variant="text" color="white" size="small" @click="createModalOpen = false"><XIcon size="18"/></v-btn>
       </v-card-title>
-      <v-card-text class="pt-4 pb-0">
-        <v-row dense>
-          <v-col cols="12" md="6" class="py-1">
-            <v-text-field v-model="createForm.transaction_code" label="Transaction Code *" variant="outlined" density="compact" hint="Harus Unik" persistent-hint class="small-input"></v-text-field>
-          </v-col>
-          <v-col cols="12" md="6" class="py-1">
-            <v-text-field v-model="createForm.account_no" label="Account No *" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
-          </v-col>
-          <v-col cols="12" md="6" class="py-1">
-            <v-text-field v-model="createForm.date" type="date" label="Date *" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
-          </v-col>
-          <v-col cols="12" md="6" class="py-1">
-            <v-text-field v-model="createForm.val_date" type="date" label="Val. Date" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
-          </v-col>
-          <v-col cols="12" md="6" class="py-1">
-            <v-text-field v-model.number="createForm.debit" type="number" label="Debit (Rp)" variant="outlined" density="compact" prefix="Rp" hide-details class="small-input text-right-input"></v-text-field>
-          </v-col>
-          <v-col cols="12" md="6" class="py-1">
-            <v-text-field v-model.number="createForm.credit" type="number" label="Credit (Rp)" variant="outlined" density="compact" prefix="Rp" hide-details class="small-input text-right-input"></v-text-field>
-          </v-col>
-          <v-col cols="12" class="py-1">
-            <v-text-field v-model="createForm.reference_no" label="Reference No." variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
-          </v-col>
-          <v-col cols="12" class="py-1">
-            <v-text-field v-model="createForm.description1" label="Description 1" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
-          </v-col>
-          <v-col cols="12" class="py-1">
-            <v-text-field v-model="createForm.description2" label="Description 2" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
-          </v-col>
-        </v-row>
-      </v-card-text>
-      <v-divider></v-divider>
-      <v-card-actions class="px-4 py-3">
-        <v-spacer></v-spacer>
-        <v-btn variant="text" color="grey" size="small" @click="createModalOpen = false" class="text-caption">Batal</v-btn>
-        <v-btn color="primary" variant="flat" size="small" @click="handleCreateSubmit" :loading="creating" class="text-caption">
-          <CheckIcon size="16" class="mr-1"/> Simpan
-        </v-btn>
-      </v-card-actions>
+      <v-form ref="createFormRef" @submit.prevent="handleCreateSubmit">
+        <v-card-text class="pt-4 pb-0">
+          <v-row dense>
+            <v-col cols="12" md="4" class="py-1">
+              <v-text-field v-model="createForm.transaction_code" label="Transaction Code *" variant="outlined" density="compact" hint="Harus Unik" persistent-hint class="small-input" :rules="requiredRule"></v-text-field>
+            </v-col>
+            <v-col cols="12" md="4" class="py-1">
+              <v-text-field v-model="createForm.post_date" type="date" label="Post Date *" variant="outlined" density="compact" hide-details class="small-input" :rules="requiredDateRule"></v-text-field>
+            </v-col>
+            <v-col cols="12" md="4" class="py-1">
+              <v-text-field v-model="createForm.eff_date" type="date" label="Eff Date" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
+            </v-col>
+
+            <v-col cols="12" md="4" class="py-1">
+              <v-text-field v-model="createForm.cheque_no" label="Cheque No" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
+            </v-col>
+            <v-col cols="12" md="4" class="py-1">
+              <v-text-field v-model="createForm.payment_type" label="Payment Type" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
+            </v-col>
+            <v-col cols="12" md="4" class="py-1">
+              <v-text-field v-model="createForm.bank_reference" label="Bank Reference" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
+            </v-col>
+
+            <v-col cols="12" class="py-1">
+              <v-textarea v-model="createForm.description" label="Description" rows="2" density="compact" variant="outlined" hide-details class="small-input small-textarea"></v-textarea>
+            </v-col>
+            
+            <v-col cols="12" md="4" class="py-1">
+              <v-text-field v-model.number="createForm.debit" type="number" label="Debit (Rp)" variant="outlined" density="compact" prefix="Rp" hide-details class="small-input text-right-input"></v-text-field>
+            </v-col>
+            <v-col cols="12" md="4" class="py-1">
+              <v-text-field v-model.number="createForm.credit" type="number" label="Credit (Rp)" variant="outlined" density="compact" prefix="Rp" hide-details class="small-input text-right-input"></v-text-field>
+            </v-col>
+            <v-col cols="12" md="4" class="py-1">
+              <v-text-field v-model.number="createForm.balance" type="number" label="Balance (Rp)" variant="outlined" density="compact" prefix="Rp" hint="Saldo Akhir" persistent-hint class="small-input text-right-input"></v-text-field>
+            </v-col>
+
+            <v-col cols="12" md="6" class="py-1">
+              <v-text-field v-model.number="createForm.line_no" type="number" label="No (Line No)" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
+            </v-col>
+            <v-col cols="12" md="6" class="py-1">
+              <v-text-field v-model="createForm.reference_no" label="Ref no" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
+            </v-col>
+          </v-row>
+        </v-card-text>
+        <v-divider></v-divider>
+        <v-card-actions class="px-4 py-3">
+          <v-spacer></v-spacer>
+          <v-btn variant="text" color="grey" size="small" @click="createModalOpen = false" class="text-caption">Batal</v-btn>
+          <v-btn color="primary" variant="flat" size="small" type="submit" :loading="creating" class="text-caption">
+            <CheckIcon size="16" class="mr-1"/> Simpan
+          </v-btn>
+        </v-card-actions>
+      </v-form>
     </v-card>
   </v-dialog>
 
-    <v-dialog v-model="modalOpen" max-width="500" scrollable>
+  <v-dialog v-model="modalOpen" max-width="500" scrollable>
     <v-card v-if="selectedItem" class="rounded-lg small-dialog-card">
       <v-card-title class="d-flex justify-space-between align-center px-4 py-3 bg-grey-lighten-4 text-subtitle-2">
         <div>
-          <div class="font-weight-bold">Detail Transaksi</div>
+          <div class="font-weight-bold">Detail Transaksi CIMB</div>
           <div class="text-caption text-grey">{{ selectedItem.transaction_code }}</div>
         </div>
         <v-btn icon variant="text" size="x-small" @click="modalOpen = false"><XIcon size="16" /></v-btn>
@@ -503,27 +595,32 @@ onBeforeUnmount(() => {
       <v-card-text class="pa-4" style="max-height: 60vh;">
         <v-row dense class="text-caption">
           <v-col cols="6" class="py-1">
-            <div class="text-overline text-medium-emphasis text-xsmall">Account No</div>
-            <div class="font-weight-medium">{{ selectedItem.account_no }}</div>
+            <div class="text-overline text-medium-emphasis text-xsmall">Post Date | Eff Date</div>
+            <div class="font-weight-medium">{{ fmtDate(selectedItem.post_date) }} | {{ fmtDate(selectedItem.eff_date) }}</div>
           </v-col>
           <v-col cols="6" class="py-1">
-            <div class="text-overline text-medium-emphasis text-xsmall">Date | Val. Date</div>
-            <div class="font-weight-medium">{{ selectedItem.date }} | {{ selectedItem.val_date }}</div>
+            <div class="text-overline text-medium-emphasis text-xsmall">Cheque No | Ref No</div>
+            <div class="font-weight-medium">{{ selectedItem.cheque_no || '-' }} | {{ selectedItem.reference_no || '-' }}</div>
           </v-col>
+
           <v-col cols="12" class="py-1">
             <div class="bg-grey-lighten-5 pa-2 rounded border">
               <div class="text-overline text-medium-emphasis text-xsmall">Description</div>
-              <div class="font-weight-medium">{{ selectedItem.description1 }}</div>
-              <div class="text-xsmall">{{ selectedItem.description2 }}</div>
+              <div class="font-weight-medium">{{ selectedItem.description }}</div>
             </div>
           </v-col>
-          <v-col cols="6" class="py-1">
+          
+          <v-col cols="4" class="py-1">
             <div class="text-overline text-medium-emphasis text-xsmall">Debit</div>
             <div class="font-weight-bold text-green text-subtitle-2">{{ fmtMoney(selectedItem.debit) }}</div>
           </v-col>
-          <v-col cols="6" class="py-1">
+          <v-col cols="4" class="py-1">
             <div class="text-overline text-medium-emphasis text-xsmall">Credit</div>
             <div class="font-weight-bold text-red text-subtitle-2">{{ fmtMoney(selectedItem.credit) }}</div>
+          </v-col>
+          <v-col cols="4" class="py-1">
+            <div class="text-overline text-medium-emphasis text-xsmall">Balance</div>
+            <div class="font-weight-bold text-primary text-subtitle-2">{{ fmtMoney(selectedItem.balance) }}</div>
           </v-col>
         </v-row>
 
@@ -538,7 +635,7 @@ onBeforeUnmount(() => {
               :href="url" target="_blank" 
               variant="outlined" size="x-small" color="primary" 
               prepend-icon="mdi-file-document-outline"
-                            class="text-caption"
+              class="text-caption"
             >
               File {{ idx + 1 }}
             </v-btn>
@@ -556,7 +653,8 @@ onBeforeUnmount(() => {
                 density="compact" 
                 variant="outlined" 
                 bg-color="white"
-                                class="small-input"
+                class="small-input"
+                :disabled="selectedItem.status === 'Approved'"
               ></v-select>
             </v-col>
             <v-col cols="6" class="py-1">
@@ -569,7 +667,8 @@ onBeforeUnmount(() => {
                 bg-color="white"
                 prepend-icon=""
                 prepend-inner-icon="mdi-paperclip"
-                                class="small-input small-file-input"
+                class="small-input small-file-input"
+                :disabled="selectedItem.status === 'Approved'"
               ></v-file-input>
             </v-col>
             <v-col cols="12" class="py-1">
@@ -580,21 +679,44 @@ onBeforeUnmount(() => {
                 density="compact" 
                 variant="outlined" 
                 bg-color="white"
-                                class="small-input small-textarea"
+                class="small-input small-textarea"
+                :disabled="selectedItem.status === 'Approved'"
               ></v-textarea>
             </v-col>
           </v-row>
         </div>
       </v-card-text>
-            <v-divider></v-divider>
+      <v-divider></v-divider>
       <v-card-actions class="px-4 py-3">
         <v-spacer></v-spacer>
-        <v-btn variant="outlined" color="secondary" size="small" @click="modalOpen = false" class="text-caption">Batal</v-btn>
-        <v-btn color="primary" size="small" @click="handleActionSubmit" :loading="submitting" class="text-caption">
+        <v-btn variant="outlined" color="secondary" size="small" @click="modalOpen = false" class="text-caption">Tutup</v-btn>
+        <v-btn 
+          v-if="selectedItem.status !== 'Approved'"
+          color="primary" 
+          size="small" 
+          @click="handleActionSubmit" 
+          :loading="submitting" 
+          class="text-caption"
+        >
           <CheckIcon size="16" class="mr-1" /> Update Status
         </v-btn>
       </v-card-actions>
     </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="deleteDialog" max-width="400">
+        <v-card class="rounded-lg">
+            <v-card-title class="text-h6 text-error">Konfirmasi Hapus</v-card-title>
+            <v-card-text>
+                Anda yakin ingin menghapus transaksi CIMB dengan kode 
+                <span class="font-weight-bold">{{ itemToDelete?.transaction_code }}</span>?
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn variant="text" @click="deleteDialog = false">Batal</v-btn>
+                <v-btn color="error" variant="flat" @click="handleDelete">Hapus</v-btn>
+            </v-card-actions>
+        </v-card>
   </v-dialog>
 
   <v-snackbar v-model="snackbar.show" :color="snackbar.color" location="top right" timeout="3000" class="text-caption">
@@ -604,7 +726,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* ======================== GENERAL COMPACT STYLES ======================== */
+/* ======================== GENERAL COMPACT STYLES (MATCHING REKON PAGE) ======================== */
 .font-mono { font-family: 'Roboto Mono', monospace; }
 .border-blue { border-left: 3px solid #42a5f5; }
 .border-green { border-left: 3px solid #66bb6a; }

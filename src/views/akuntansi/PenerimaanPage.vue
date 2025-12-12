@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// FIX: Tambahkan onBeforeUnmount
 import { ref, reactive, onMounted, computed, watch, onBeforeUnmount } from 'vue'; 
 import { format } from 'date-fns';
+import { useAuthStore } from '@/stores/auth';
 import UiParentCard from '@/components/shared/UiParentCard.vue';
 import AsyncSelect from '@/components/common/AsyncSelect.vue';
 import { 
@@ -14,18 +14,17 @@ import {
   XIcon,
   CalendarEventIcon,
   BuildingBankIcon,
-  SearchIcon // Tambahkan SearchIcon untuk input
+  SearchIcon 
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
+const authStore = useAuthStore();
 
-// FIX: Pindahkan deklarasi timer ke lingkup script setup
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-// STATE
 const loadingList = ref(false);
 const receiptList = ref<any[]>([]);
-const search = ref(''); // Added search state for UI consistency
+const search = ref(''); 
 const headers = [
   { title: 'No', key: 'index', align: 'center' as const, sortable: false },
   { title: 'Receipt #', key: 'number', align: 'start' as const },
@@ -46,19 +45,17 @@ const saving = ref(false);
 
 const dialogDetail = ref(false);
 const detailData = ref<any>(null);
-const loadingDetail = ref(false); // Added loading state for detail
+const loadingDetail = ref(false); 
 
 const snackbar = reactive({ show: false, text: '', color: 'success' });
 const showMsg = (text: string, color = 'success') => { snackbar.text = text; snackbar.color = color; snackbar.show = true; };
 
 const totalAmount = computed(() => form.items.reduce((s, i) => s + (Number(i.amount)||0), 0));
 
-// METHODS
 const fetchList = async () => {
   loadingList.value = true;
   try {
     const url = new URL(`${API_BASE_URL}/Penerimaan/List.php`);
-    // Added search logic support if needed in future (UI is ready)
     if (search.value) url.searchParams.append("q", search.value); 
     
     const res = await fetch(url.toString());
@@ -67,20 +64,16 @@ const fetchList = async () => {
     else receiptList.value = [];
   } catch { 
     receiptList.value = []; 
-    // FIX: Tambahkan error handling notifikasi jika gagal fetch list
     showMsg('Gagal memuat daftar penerimaan.', 'error');
   } 
   finally { loadingList.value = false; }
 };
 
-// FIX: Buat fungsi debounce untuk watch
 const fetchListDebounced = () => {
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(fetchList, 600);
 }
 
-// Debounce search watcher
-// FIX: Gunakan fungsi debounced
 watch(search, fetchListDebounced);
 
 const handleSubmit = async () => {
@@ -89,11 +82,12 @@ const handleSubmit = async () => {
   saving.value = true;
   try {
     const payload = {
-      // FIX: Pertahankan logic asli format tanggal
       transDate: format(new Date(form.transDate), 'dd/MM/yyyy'),
       bankId: form.bankId,
       description: form.description || "Penerimaan Lain",
-      detailAccount: form.items.map(d => ({ accountNo: d.accountNo, amount: d.amount, detailNotes: d.notes }))
+      detailAccount: form.items.map(d => ({ accountNo: d.accountNo, amount: d.amount, detailNotes: d.notes })),
+      user_id: authStore.userData?.id,
+      user_name: authStore.userData?.name
     };
     const res = await fetch(`${API_BASE_URL}/Penerimaan/Transaksi.php`, {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
@@ -103,13 +97,12 @@ const handleSubmit = async () => {
       showMsg('Penerimaan Berhasil Disimpan');
       form.transDate = format(new Date(), 'yyyy-MM-dd');
       form.description = '';
-      form.bankName = ''; // Reset UI display name
+      form.bankName = ''; 
       form.bankId = null;
       form.items = [{ id: Date.now(), accountNo: '', accountName: '', amount: 0, notes: '' }];
       fetchList();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      // FIX: Penanganan error dari backend
       showMsg(json.d?.message || json.message || 'Gagal menyimpan transaksi penerimaan.', 'error');
     }
   } catch { showMsg('Error koneksi saat menyimpan transaksi.', 'error'); } 
@@ -131,7 +124,6 @@ const openDetail = async (id: number) => {
 
 onMounted(fetchList);
 
-// FIX: Bersihkan timer saat komponen dilepas
 onBeforeUnmount(() => {
   if (searchTimeout) clearTimeout(searchTimeout);
 });
