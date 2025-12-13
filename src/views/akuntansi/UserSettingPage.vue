@@ -11,7 +11,7 @@ import {
     DeviceFloppyIcon // Tambahkan icon untuk konsistensi save
 } from 'vue-tabler-icons';
 
-const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
+const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 
 // --- DATA & STATE ---
 const users = ref<any[]>([]);

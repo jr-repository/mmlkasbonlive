@@ -3,7 +3,7 @@ import { ref, reactive, onMounted } from 'vue';
 import UiParentCard from '@/components/shared/UiParentCard.vue';
 import { PlusIcon, TrashIcon, CheckIcon, XIcon, ReceiptTaxIcon, DeviceFloppyIcon, PencilIcon } from 'vue-tabler-icons'; // FIX: Tambahkan PencilIcon
 
-const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
+const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 
 const loading = ref(false);
 const taxes = ref<any[]>([]);

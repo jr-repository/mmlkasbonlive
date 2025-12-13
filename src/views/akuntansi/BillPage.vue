@@ -9,7 +9,7 @@ PlusIcon, TrashIcon, EyeIcon, DeviceFloppyIcon, XIcon, WalletIcon,
 CheckIcon, BanIcon, PencilIcon, FileInvoiceIcon, TagIcon, SearchIcon, ListCheckIcon, FormsIcon, RefreshIcon
 } from 'vue-tabler-icons';
 
-const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
+const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 const authStore = useAuthStore();
 
 // --- STATE NAVIGASI TAB BARU ---

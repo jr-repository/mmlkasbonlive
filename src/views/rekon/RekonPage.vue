@@ -18,7 +18,7 @@ import {
   CalendarIcon 
 } from 'vue-tabler-icons';
 
-const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
+const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 const router = useRouter();
 const authStore = useAuthStore();
 const fileInput = ref<HTMLInputElement | null>(null);

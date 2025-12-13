@@ -1,6 +1,6 @@
 // Lokasi: src/services/auth.service.ts
 
-const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
+const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 
 export const authService = {
     async login(username: string, password: string) {

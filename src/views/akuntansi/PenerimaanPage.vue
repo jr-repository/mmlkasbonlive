@@ -17,7 +17,7 @@ import {
   SearchIcon 
 } from 'vue-tabler-icons';
 
-const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
+const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 const authStore = useAuthStore();
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;

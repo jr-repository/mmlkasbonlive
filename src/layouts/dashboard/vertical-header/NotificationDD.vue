@@ -3,7 +3,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { BellRingingIcon } from 'vue-tabler-icons';
 import { useAuthStore } from '@/stores/auth';
 
-const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
+const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 const authStore = useAuthStore();
 
 const notifications = ref<any[]>([]);

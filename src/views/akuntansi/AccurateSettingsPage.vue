@@ -16,7 +16,7 @@ import {
   SettingsIcon
 } from 'vue-tabler-icons';
 
-const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
+const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 const APP_KEY = "175c2c10-d684-4ad8-ab42-e6739b7a1ea4";
 const FIXED_SIGNATURE = "rC8VEMrTx1AQuS3OWhbdjYnY7SgKjnOyFeecFaDpIiuW9K8XFFhk6lKHFJhuXin0";
 

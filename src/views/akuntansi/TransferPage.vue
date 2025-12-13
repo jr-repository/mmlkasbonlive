@@ -19,7 +19,7 @@ import {
   SearchIcon // Tambahkan SearchIcon untuk input
 } from 'vue-tabler-icons';
 
-const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
+const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 const authStore = useAuthStore(); // Init Store
 
 // FIX: Pindahkan deklarasi timer ke lingkup script setup

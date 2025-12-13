@@ -14,7 +14,7 @@ import {
   CalendarEventIcon
 } from 'vue-tabler-icons';
 
-const API_BASE_URL = "https://kasbon2.multimitralogistik.id/Api";
+const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 
 // --- STATE FILTER ---
 const fromDate = ref(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
