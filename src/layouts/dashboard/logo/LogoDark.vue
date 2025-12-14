@@ -1,6 +1,6 @@
 <template>
   <div class="logo">
-    <RouterLink to="/dashboard" aria-label="logo">
+    <RouterLink to="/" aria-label="logo">
       <img
         src="https://ptmultimitralogistik.com/wp-content/uploads/2023/05/Multi-Mitra-Logistik.png"
         alt="Logo"
