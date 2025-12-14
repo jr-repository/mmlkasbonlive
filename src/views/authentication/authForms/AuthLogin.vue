@@ -9,7 +9,7 @@ const checkbox = ref(false);
 const valid = ref(false);
 const show1 = ref(false);
 const password = ref('');
-const username = ref('');
+const email = ref('');
 // Password validation rules
 const passwordRules = ref([
   (v: string) => !!v || 'Password is required',
@@ -29,10 +29,10 @@ const emailRules = ref([
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function validate(values: any, { setErrors }: any) {
   // Trim the username before validation
-  const trimmedUsername = username.value.trim();
+  const trimmedUsername = email.value.trim();
 
   // Update the username with trimmed value
-  username.value = trimmedUsername;
+  email.value = trimmedUsername;
 
   const authStore = useAuthStore();
   return authStore.login(trimmedUsername, password.value).catch((error) => setErrors({ apiError: error }));
@@ -49,14 +49,14 @@ function validate(values: any, { setErrors }: any) {
       <v-label>Email Address</v-label>
       <v-text-field
         aria-label="email address"
-        v-model="username"
+        v-model="email"
         :rules="emailRules"
         class="mt-2"
         required
         hide-details="auto"
         variant="outlined"
         color="primary"
-        @input="username"
+        @input="email"
       ></v-text-field>
     </div>
     <div>

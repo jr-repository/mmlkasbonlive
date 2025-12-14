@@ -319,25 +319,39 @@ fetchList();
                         <div class="d-flex align-center">
                             <h3 class="text-subtitle-1 font-weight-bold text-primary">All Vendor Bill Records (AP)</h3>
                         </div>
-                        <div class="d-flex align-center gap-1">
-                            <v-text-field
-                                v-model="search"
-                                density="compact"
-                                variant="solo-filled"
-                                label="Search Data..."
-                                hide-details
-                                single-line
-                                bg-color="white"
-                                class="rounded small-search-input"
-                            >
-                                <template v-slot:prepend-inner>
-                                    <SearchIcon size="18" class="text-grey-darken-1" />
-                                </template>
-                            </v-text-field>
-                            <v-btn icon variant="text" color="primary" @click="fetchList" :loading="loadingList" title="Refresh" size="small">
-                                <RefreshIcon size="18"/>
-                            </v-btn>
+                        <div class="d-flex align-center gap-2" style="min-width: 420px;">
+                          <v-text-field
+                              v-model="search"
+                              density="compact"
+                              variant="solo-filled"
+                              label="Search Data..."
+                              hide-details
+                              single-line
+                              bg-color="white"
+                              class="rounded"
+                              style="width: 360px;"
+                          >
+                              <template v-slot:prepend-inner>
+                                  <SearchIcon
+                                      size="18"
+                                      class="text-grey-darken-1 mr-1"
+                                  />
+                              </template>
+                          </v-text-field>
+
+                          <v-btn
+                              icon
+                              variant="text"
+                              color="primary"
+                              @click="fetchList"
+                              :loading="loadingList"
+                              title="Refresh"
+                              size="small"
+                          >
+                              <RefreshIcon size="18" />
+                          </v-btn>
                         </div>
+
                     </div>
     
                     <v-data-table 

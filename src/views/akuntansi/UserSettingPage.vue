@@ -64,9 +64,12 @@ const menuList = [
   { key: 'settings', label: 'Konfigurasi Sistem' },
 ];
 
+// UPDATE: Menambahkan kolom 'avatar' dan 'email' pada header
 const headers = [
-    { title: 'No', key: 'index', align: 'center' as const, sortable: false, width: '50px' },
+  { title: 'No', key: 'index', align: 'center' as const, sortable: false, width: '50px' },
+  { title: 'Foto', key: 'avatar', align: 'center' as const, sortable: false, width: '70px' }, // Kolom Foto
   { title: 'User Info', key: 'userInfo', align: 'start' as const, sortable: false },
+  { title: 'Email', key: 'email', align: 'start' as const, sortable: false }, // Kolom Email
   { title: 'Role', key: 'role', align: 'start' as const, sortable: false },
   { title: 'Access', key: 'access', align: 'center' as const, sortable: false, width: '150px' },
   { title: 'Actions', key: 'actions', align: 'center' as const, sortable: false, width: '100px' },
@@ -250,11 +253,31 @@ onMounted(fetchUsers);
                         <span class="text-caption text-medium-emphasis">{{ item.index }}</span>
                     </template>
 
+                    <template v-slot:item.avatar="{ item }">
+                      <div class="py-1">
+                          <v-avatar size="32" class="border" color="grey-lighten-3">
+                              <v-img
+                                  :src="item.profile_picture
+                                      ? `https://multimitralogistik.id/Backend/${item.profile_picture}`
+                                      : 'https://multimitralogistik.id/Backend/uploads/profile/default.png'"
+                                  cover
+                                  alt="Foto"
+                              />
+                          </v-avatar>
+                      </div>
+                    </template>
+
                     <template v-slot:item.userInfo="{ item }">
                         <div class="py-2">
                             <div class="font-weight-bold text-caption">{{ item.name }}</div>
                             <div class="text-xsmall text-grey">@{{ item.username }}</div>
                         </div>
+                    </template>
+
+                    <template v-slot:item.email="{ item }">
+                        <span class="text-caption text-grey-darken-1">
+                            {{ item.email || '-' }}
+                        </span>
                     </template>
 
                     <template v-slot:item.role="{ item }">
@@ -334,7 +357,7 @@ onMounted(fetchUsers);
                         class="mb-3 small-input"
                     ></v-text-field>
 
-                    <v-label class="mb-1 text-caption font-weight-bold text-grey-darken-2 d-block">Username</v-label>
+                    <v-label class="mb-1 text-caption font-weight-bold text-grey-darken-2 d-block">Email</v-label>
                     <v-text-field 
                         v-model="form.username" 
                         variant="outlined" 

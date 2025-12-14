@@ -3,12 +3,12 @@
 const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 
 export const authService = {
-    async login(username: string, password: string) {
+    async login(email: string, password: string) {
         try {
             const response = await fetch(`${API_BASE_URL}/Login/Auth.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ email, password })
             });
 
             const json = await response.json();

@@ -9,7 +9,8 @@ import {
     UsersIcon,
     SettingsIcon,
     ShieldCheckIcon,
-    ActivityIcon // Icon Baru
+    ActivityIcon, // Icon Baru
+    UserCircleIcon // Icon untuk Profile Setting
 } from 'vue-tabler-icons';
 
 export interface menu {
@@ -109,6 +110,13 @@ const sidebarItem: menu[] = [
 
     // --- Kategori: Administrasi & Konfigurasi Sistem ---
     { header: 'Administrasi & Pengaturan' },
+    // --- PENAMBAHAN MENU BARU: PROFILE SETTING ---
+    {
+        title: 'Profile Setting',
+        icon: UserCircleIcon,
+        to: '/profile-settings'
+    },
+    // ----------------------------------------------
     {
         title: 'Manajemen User',
         icon: UsersIcon,

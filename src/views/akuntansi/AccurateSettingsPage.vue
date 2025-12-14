@@ -13,7 +13,10 @@ import {
   EyeOffIcon,
   CopyIcon,
   HelpIcon,
-  SettingsIcon
+  SettingsIcon,
+  LockIcon,       // Ikon Gembok
+  LockOpenIcon,   // Ikon Gembok Terbuka
+  EditIcon        // Ikon Edit
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
@@ -25,11 +28,12 @@ const loading = ref(false);
 const fetching = ref(true);
 const showToken = ref(false);
 const showSignature = ref(false);
-const activeTab = ref('credential'); // State untuk Tab
+const activeTab = ref('credential'); 
+const isEditable = ref(false); // State baru: FALSE = Readonly (Gembok)
 
 const config = reactive({
   api_token: "",
-  signature_secret: FIXED_SIGNATURE, // Default Value
+  signature_secret: FIXED_SIGNATURE,
   accurate_host: "",
   branch_id: "",
   warehouse_name: "",
@@ -47,14 +51,13 @@ const showMsg = (text: string, color = 'success') => {
 // --- METHODS ---
 const fetchSettings = async () => {
   fetching.value = true;
+  isEditable.value = false; // Pastikan terkunci saat memuat pengaturan
   try {
     const res = await fetch(`${API_BASE_URL}/Settings/Get.php`);
     const json = await res.json();
     
     if (json.s && json.d) {
       config.api_token = json.d.api_token?.setting_value || "";
-      // Gunakan nilai dari DB jika ada, jika tidak gunakan fixed value
-      // Tapi requirement meminta untuk MENETAPKAN nilai ini, jadi kita bisa override atau gunakan default
       config.signature_secret = FIXED_SIGNATURE; 
       config.accurate_host = json.d.accurate_host?.setting_value || "https://zeus.accurate.id";
       config.branch_id = json.d.branch_id?.setting_value || "50";
@@ -83,6 +86,7 @@ const handleSave = async () => {
 
     if (json.s) {
       showMsg("Konfigurasi sistem telah diperbarui.", "success");
+      isEditable.value = false; // Kunci kembali setelah berhasil menyimpan
     } else {
       throw new Error(json.message || "Gagal menyimpan");
     }
@@ -96,6 +100,11 @@ const handleSave = async () => {
 const copyAppKey = () => {
   navigator.clipboard.writeText(APP_KEY);
   showMsg("App Key disalin ke clipboard", "success");
+};
+
+// Fungsi untuk membuka/menutup mode edit
+const toggleEditMode = () => {
+    isEditable.value = !isEditable.value;
 };
 
 onMounted(fetchSettings);
@@ -133,7 +142,19 @@ onMounted(fetchSettings);
             <v-row>
               <v-col cols="12" md="8">
                 <UiParentCard title="Kredensial API" class="pa-0">
-                  <template v-slot:action><KeyIcon size="18" class="text-primary" /></template>
+                  <template v-slot:action>
+                    <v-btn 
+                      :color="isEditable ? 'success' : 'primary'" 
+                      :variant="isEditable ? 'flat' : 'outlined'"
+                      size="small"
+                      class="text-caption text-none"
+                      :loading="loading"
+                      @click="isEditable ? handleSave() : toggleEditMode()"
+                    >
+                      <component :is="isEditable ? DeviceFloppyIcon : EditIcon" size="18" class="mr-1" />
+                      {{ isEditable ? "Simpan Perubahan" : "Edit Konfigurasi" }}
+                    </v-btn>
+                  </template>
                   
                   <div class="mb-3 bg-lightprimary pa-3 rounded border border-primary border-opacity-25">
                     <v-label class="mb-1 font-weight-bold text-primary text-caption">App Key (Aplikasi Saya)</v-label>
@@ -157,7 +178,12 @@ onMounted(fetchSettings);
                       class="font-mono-input"
                       persistent-hint
                       hint="Token ini didapatkan dari Developer Portal Accurate."
+                      :readonly="!isEditable || fetching"
                     >
+                      <template v-slot:prepend-inner>
+                        <LockIcon v-if="!isEditable" size="18" class="text-grey" />
+                        <LockOpenIcon v-else size="18" class="text-success" />
+                      </template>
                       <template v-slot:append-inner>
                         <v-btn icon variant="text" size="x-small" @click="showToken = !showToken" color="grey">
                           <component :is="showToken ? EyeOffIcon : EyeIcon" size="18" />
@@ -204,6 +230,7 @@ onMounted(fetchSettings);
               <v-col cols="12" md="4">
                 <UiParentCard title="Operasional" class="pa-0">
                   <template v-slot:action><MapPinIcon size="18" class="text-orange" /></template>
+                  
                   <div class="mb-3">
                     <v-text-field
                       v-model="config.branch_id"
@@ -213,8 +240,14 @@ onMounted(fetchSettings);
                       density="compact"
                       persistent-hint
                       hint="ID Cabang di Accurate (Default: 50)"
-                    ></v-text-field>
+                      :readonly="!isEditable || fetching"
+                    >
+                      <template v-slot:prepend-inner v-if="!isEditable">
+                          <LockIcon size="18" class="text-grey" />
+                      </template>
+                    </v-text-field>
                   </div>
+                  
                   <div class="mb-3">
                     <v-text-field
                       v-model="config.warehouse_name"
@@ -223,8 +256,14 @@ onMounted(fetchSettings);
                       density="compact"
                       persistent-hint
                       hint="Nama Gudang harus persis sama dengan di Accurate."
-                    ></v-text-field>
+                      :readonly="!isEditable || fetching"
+                    >
+                      <template v-slot:prepend-inner v-if="!isEditable">
+                          <LockIcon size="18" class="text-grey" />
+                      </template>
+                    </v-text-field>
                   </div>
+                  
                   <div class="mb-4">
                     <v-text-field
                       v-model="config.tax_rate"
@@ -236,11 +275,23 @@ onMounted(fetchSettings);
                       density="compact"
                       persistent-hint
                       hint="Contoh: 0.11 untuk 11%, 0.12 untuk 12%."
+                      :readonly="!isEditable || fetching"
                     >
-                      <template v-slot:prepend-inner><PercentageIcon size="18" class="text-grey" /></template>
+                      <template v-slot:prepend-inner>
+                          <PercentageIcon size="18" :class="{'text-grey': !isEditable, 'text-success': isEditable}" />
+                          <LockIcon v-if="!isEditable" size="18" class="text-grey ml-1" />
+                      </template>
                     </v-text-field>
                   </div>
-                  <v-btn block color="primary" size="small" type="submit" :loading="loading">
+                  
+                  <v-btn 
+                    v-if="isEditable"
+                    block 
+                    color="primary" 
+                    size="small" 
+                    type="submit" 
+                    :loading="loading"
+                  >
                     <DeviceFloppyIcon size="18" class="mr-1" />
                     {{ loading ? "Menyimpan..." : "Simpan Konfigurasi" }}
                   </v-btn>
@@ -313,8 +364,8 @@ onMounted(fetchSettings);
 /* Menurunkan ukuran font di input yang bertipe monospace agar lebih kompak */
 .font-mono-input :deep(input) { 
     font-family: monospace !important; 
-    font-size: 0.8rem !important; /* Dikecilkan */
-    height: 18px; /* Dikecilkan */
+    font-size: 0.8rem !important;
+    height: 18px; 
 }
 /* Memastikan hint dan label pada text-field juga mengecil */
 .v-input--density-compact :deep(.v-input__details) {
@@ -325,12 +376,12 @@ onMounted(fetchSettings);
 .v-input--density-compact :deep(.v-field__input) {
     padding-top: 4px !important;
     padding-bottom: 4px !important;
-    min-height: 32px; /* Dikecilkan */
+    min-height: 32px; 
 }
 
 .v-input--density-compact :deep(.v-field) {
-    --v-field-padding-bottom: 4px; /* Dikecilkan */
-    --v-field-padding-top: 4px; /* Dikecilkan */
+    --v-field-padding-bottom: 4px; 
+    --v-field-padding-top: 4px; 
 }
 
 /* Mengatur kembali warna dan kursor untuk input readonly */
@@ -341,17 +392,17 @@ onMounted(fetchSettings);
 
 /* Menyesuaikan ukuran font dan padding di card-header (UiParentCard) */
 :deep(.v-card-title) {
-    font-size: 0.9rem !important; /* Dikecilkan */
-    padding: 10px 16px !important; /* Dikecilkan */
+    font-size: 0.9rem !important; 
+    padding: 10px 16px !important; 
 }
 /* Menyesuaikan padding di card-content (UiParentCard) */
 :deep(.v-card-text) {
-    padding: 12px 16px 16px !important; /* Dikecilkan */
+    padding: 12px 16px 16px !important; 
 }
 /* Menyesuaikan ukuran font dan padding tab */
 .v-tabs :deep(.v-tab) {
-    font-size: 0.8rem !important; /* Dikecilkan */
-    padding: 0 10px; /* Dikecilkan */
+    font-size: 0.8rem !important; 
+    padding: 0 10px; 
 }
 
 /* Menyesuaikan ukuran font pada teks umum di Vuetify, secara global tidak disarankan, 
@@ -365,6 +416,6 @@ tapi bisa membantu konsistensi di konteks ini */
 }
 
 :deep(.v-input__details .v-messages) {
-    font-size: 0.7rem; /* Dikecilkan ukuran hint */
+    font-size: 0.7rem; 
 }
 </style>

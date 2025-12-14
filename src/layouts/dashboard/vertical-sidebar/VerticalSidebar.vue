@@ -29,11 +29,15 @@ const menuKeyMap: Record<string, string> = {
     'Setting Pajak': 'master_tax',   
     'Manajemen User': 'users',
     'Setting Approver': 'approver_settings', 
-    'Konfigurasi Sistem': 'settings'
+    'Konfigurasi Sistem': 'settings',
+    'Profile Setting': 'profile_settings' // PENAMBAHAN MAPPING BARU
 };
 
 // Logic Filter Flat Array Sidebar
 const displayedItems = computed(() => {
+    // Asumsi: Semua user harus bisa mengakses Profile Setting,
+    // kecuali jika ada permission khusus. Jika tidak ada permission
+    // khusus, kembalikan true.
     if (authStore.isAdmin) return sidebarMenu.value;
     
     const userPerms = authStore.userData?.permissions || [];
@@ -55,7 +59,9 @@ const displayedItems = computed(() => {
 
         // Cek item level 1 yang biasa (tanpa children)
         const key = menuKeyMap[item.title || ''];
-        if (!key) return true; // Jika tidak ada di map, anggap public (atau hide jika strict)
+        
+        // Tampilkan Profile Setting, Dashboard, dan menu yang tidak di-map secara default
+        if (!key || key === 'dashboard' || key === 'profile_settings') return true; 
         
         return userPerms.includes(key);
     });

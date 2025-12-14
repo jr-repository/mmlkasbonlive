@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { 
   WalletIcon, 
   ChartDotsIcon, 
@@ -11,27 +11,36 @@ import {
   FilterIcon,
   PrinterIcon,
   DownloadIcon,
-  CalendarEventIcon
+  CalendarEventIcon,
+  RefreshIcon,
+  AlertCircleIcon, // Tambahkan ikon baru
+  MessageCircleIcon, // Tambahkan ikon baru
+  ClockHour4Icon // Tambahkan ikon baru
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 
 // --- STATE FILTER ---
-const fromDate = ref(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
-const toDate = ref(format(new Date(), 'yyyy-MM-dd'));
+const defaultFromDate = format(startOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd');
+const defaultToDate = format(new Date(), 'yyyy-MM-dd');
+
+const fromDate = ref(defaultFromDate);
+const toDate = ref(defaultToDate);
 
 // --- LOGIC & STATE DATA ---
 const data = ref<any>(null); 
-const loading = ref(true);
+const loading = ref(false); 
+const dataLoaded = ref(false); // State baru untuk melacak apakah data sudah pernah dimuat
 let filterTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // Helper Format Rupiah
 const fmt = (v: number) => v ? `Rp ${Number(v).toLocaleString('id-ID')}` : 'Rp 0';
 
 const fetchData = async () => {
+  if (loading.value) return; 
+
   loading.value = true;
   try {
-    // Format tanggal ke dd/mm/yyyy untuk Accurate API
     const fmtFrom = format(new Date(fromDate.value), 'dd/MM/yyyy');
     const fmtTo = format(new Date(toDate.value), 'dd/MM/yyyy');
     
@@ -42,23 +51,38 @@ const fetchData = async () => {
 
     const res = await fetch(`${API_BASE_URL}/Dashboard/DashboardData.php?${params.toString()}`);
     const json = await res.json();
-    if(json.s) data.value = json.d;
+    if(json.s) {
+      data.value = json.d;
+      dataLoaded.value = true; 
+    } else {
+      data.value = null;
+    }
   } catch (e) {
     console.error(e);
+    data.value = null; // Clear data on error
   } finally { 
     loading.value = false; 
   }
 };
 
 const fetchDataDebounced = () => {
+    // Hanya panggil debounced fetch jika data sudah pernah dimuat (trigger filter)
+    if (!dataLoaded.value) return; 
+
     if (filterTimeout) clearTimeout(filterTimeout);
     filterTimeout = setTimeout(fetchData, 500);
 }
 
-// Watch Filter
-watch([fromDate, toDate], fetchDataDebounced);
+const fetchDataExplicit = async () => {
+    // Atur tanggal kembali ke bulan terakhir (default) sebelum fetch
+    fromDate.value = defaultFromDate;
+    toDate.value = defaultToDate;
+    
+    // Panggil fetchData tanpa debouncing
+    await fetchData();
+}
 
-onMounted(fetchData);
+watch([fromDate, toDate], fetchDataDebounced);
 
 onBeforeUnmount(() => {
     if (filterTimeout) clearTimeout(filterTimeout);
@@ -101,6 +125,25 @@ const chartPLSeries = computed(() => [
   data.value?.summary?.revenue || 0,
   data.value?.summary?.expense || 0
 ]);
+
+// Data untuk Carousel Placeholder
+const carouselItems = [
+    { 
+        title: 'Akuntansi & Keuangan', 
+        subtitle: 'Optimalisasi Laporan Bisnis Anda.', 
+        src: 'https://ptmultimitralogistik.com/wp-content/uploads/2023/06/service_logistik.png' 
+    },
+    { 
+        title: 'Integrasi Akurat', 
+        subtitle: 'Sinkronisasi Data Real-time ke Accurate.', 
+        src: 'https://images.unsplash.com/photo-1542744173-05336fcc7ad4?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'
+    },
+    { 
+        title: 'Akses Cepat Neraca', 
+        subtitle: 'Export PDF & Excel Kapan Saja.', 
+        src: 'https://ptmultimitralogistik.com/wp-content/uploads/2023/05/freight_forwarding.jpg'
+    }
+];
 </script>
 
 <template>
@@ -125,15 +168,35 @@ const chartPLSeries = computed(() => [
                         <span class="text-caption text-grey mx-1">-</span>
                         <input type="date" v-model="toDate" class="date-input text-caption font-weight-bold" />
                     </div>
-                    <v-btn icon variant="flat" color="white" size="small" @click="fetchData" :loading="loading" title="Refresh Data">
+                    
+                    <v-btn icon variant="flat" color="white" size="small" @click="fetchData" :loading="loading && dataLoaded" title="Filter Data">
                         <FilterIcon size="20" class="text-primary"/>
                     </v-btn>
                     
+                    <v-btn 
+                        color="white" 
+                        variant="outlined" 
+                        size="small" 
+                        class="text-none font-weight-medium" 
+                        @click="fetchDataExplicit" 
+                        :loading="loading && !dataLoaded"
+                        title="Sync Data 1 Bulan Terakhir"
+                    >
+                        <RefreshIcon size="18" class="mr-1"/> Sync Data
+                    </v-btn>
+
                     <v-divider vertical class="mx-1 border-white opacity-50" style="height: 20px;"></v-divider>
 
                     <v-menu location="bottom end">
                         <template v-slot:activator="{ props }">
-                            <v-btn color="white" variant="outlined" size="small" class="text-none" v-bind="props">
+                            <v-btn 
+                                color="white" 
+                                variant="outlined" 
+                                size="small" 
+                                class="text-none font-weight-medium" 
+                                v-bind="props"
+                                :disabled="!dataLoaded || loading"
+                            >
                                 <DownloadIcon size="18" class="mr-1"/> Export Neraca
                             </v-btn>
                         </template>
@@ -153,12 +216,134 @@ const chartPLSeries = computed(() => [
         </v-card>
     </v-col>
 
-    <v-col cols="12" v-if="loading && !data" class="text-center py-5">
+    <v-col cols="12" v-if="loading && dataLoaded" class="text-center py-5">
       <v-progress-circular indeterminate color="primary"></v-progress-circular>
-      <div class="mt-2 text-caption text-grey">Loading financial data...</div>
+      <div class="mt-2 text-caption text-grey">Updating financial data...</div>
     </v-col>
 
-    <template v-else-if="data">
+    <v-col cols="12" v-else-if="!dataLoaded">
+        <v-row>
+            <v-col cols="12" md="7">
+                <v-card elevation="2" rounded="lg" class="pa-0 compact-card overflow-hidden h-100">
+                    <v-carousel 
+                        cycle 
+                        height="300" 
+                        hide-delimiter-background 
+                        show-arrows="hover"
+                        class="placeholder-carousel"
+                    >
+                        <v-carousel-item
+                            v-for="(item, i) in carouselItems"
+                            :key="i"
+                            :src="item.src"
+                            cover
+                            gradient="to top right, rgba(0,0,0,.3), rgba(0,0,0,.7)"
+                        >
+                            <div class="d-flex fill-height align-end justify-start pa-6 text-white">
+                                <div>
+                                    <h3 class="text-h5 font-weight-bold mb-1">{{ item.title }}</h3>
+                                    <p class="text-subtitle-1">{{ item.subtitle }}</p>
+                                </div>
+                            </div>
+                        </v-carousel-item>
+                    </v-carousel>
+                    <v-card-text class="py-3 px-4 bg-primary-darken-1">
+                        <div class="d-flex align-center justify-space-between">
+                            <span class="text-caption text-white opacity-80">
+                                <ClockHour4Icon size="16" class="mr-1"/> Last Updated: N/A - Click 'Sync Data' to load.
+                            </span>
+                            <v-btn 
+                                color="white" 
+                                variant="text" 
+                                size="small" 
+                                class="text-none" 
+                                @click="fetchDataExplicit"
+                                :loading="loading"
+                            >
+                                <RefreshIcon size="16" class="mr-1"/> Load Data
+                            </v-btn>
+                        </div>
+                    </v-card-text>
+                </v-card>
+            </v-col>
+
+            <v-col cols="12" md="5">
+                <v-card elevation="2" rounded="lg" class="compact-card h-100 bg-blue-grey-lighten-5">
+                    <v-card-title class="bg-primary text-white py-3">
+                        <AlertCircleIcon size="20" class="mr-2"/> Informasi Penting
+                    </v-card-title>
+                    <v-card-text class="py-4">
+                        <div class="d-flex align-start mb-4">
+                            <v-icon color="warning" class="mt-1 mr-3" size="20">mdi-alert-box</v-icon>
+                            <div>
+                                <h4 class="text-subtitle-2 font-weight-bold mb-1">Peringatan Server</h4>
+                                <p class="text-caption text-grey-darken-1">
+                                    Untuk menghindari *overload* pada Accurate API, data dashboard tidak dimuat secara otomatis.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="d-flex align-start mb-4">
+                            <v-icon color="success" class="mt-1 mr-3" size="20">mdi-check-circle</v-icon>
+                            <div>
+                                <h4 class="text-subtitle-2 font-weight-bold mb-1">Aksi Cepat</h4>
+                                <p class="text-caption text-grey-darken-1">
+                                    Gunakan tombol **Sync Data** untuk melihat data bulan terakhir, atau atur filter tanggal sesuai kebutuhan Anda.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="d-flex align-start">
+                            <v-icon color="info" class="mt-1 mr-3" size="20">mdi-clock-outline</v-icon>
+                            <div>
+                                <h4 class="text-subtitle-2 font-weight-bold mb-1">Interval Refresh</h4>
+                                <p class="text-caption text-grey-darken-1">
+                                    Data yang ditarik adalah data final per tanggal yang dipilih.
+                                </p>
+                            </div>
+                        </div>
+                    </v-card-text>
+                </v-card>
+            </v-col>
+
+            <v-col cols="12" md="6">
+                <v-card elevation="2" rounded="lg" class="compact-card overflow-hidden">
+                    <div class="d-flex align-center justify-space-between px-4 py-3 bg-grey-lighten-5 border-bottom">
+                        <span class="text-subtitle-2 font-weight-bold text-grey-darken-2"><MessageCircleIcon size="16" class="mr-1"/> News & Updates</span>
+                    </div>
+                    <v-list density="compact">
+                        <v-list-item class="py-2">
+                            <v-list-item-title class="text-caption font-weight-medium">New Feature: Automatic Backup</v-list-item-title>
+                            <v-list-item-subtitle class="text-caption text-grey">Sistem akan menyimpan snapshot data per akhir bulan.</v-list-item-subtitle>
+                        </v-list-item>
+                        <v-list-item class="py-2">
+                            <v-list-item-title class="text-caption font-weight-medium">System Maintenance Reminder</v-list-item-title>
+                            <v-list-item-subtitle class="text-caption text-grey">Jadwal maintenance rutin berikutnya: 25 Des 2025.</v-list-item-subtitle>
+                        </v-list-item>
+                    </v-list>
+                </v-card>
+            </v-col>
+
+            <v-col cols="12" md="6">
+                <v-card elevation="2" rounded="lg" class="compact-card overflow-hidden">
+                    <div class="d-flex align-center justify-space-between px-4 py-3 bg-grey-lighten-5 border-bottom">
+                        <span class="text-subtitle-2 font-weight-bold text-grey-darken-2"><CoinIcon size="16" class="mr-1"/> Accounting Quick Tips</span>
+                    </div>
+                    <v-list density="compact">
+                        <v-list-item class="py-2">
+                            <v-list-item-title class="text-caption font-weight-medium">Pastikan Saldo Awal Akurat</v-list-item-title>
+                            <v-list-item-subtitle class="text-caption text-grey">Periksa saldo awal tiap periode agar laporan seimbang.</v-list-item-subtitle>
+                        </v-list-item>
+                        <v-list-item class="py-2">
+                            <v-list-item-title class="text-caption font-weight-medium">Pemisahan Biaya Operasional</v-list-item-title>
+                            <v-list-item-subtitle class="text-caption text-grey">Klasifikasikan pengeluaran dengan benar untuk profit yang jelas.</v-list-item-subtitle>
+                        </v-list-item>
+                    </v-list>
+                </v-card>
+            </v-col>
+
+        </v-row>
+    </v-col>
+
+    <template v-else-if="dataLoaded && data">
       <v-col cols="12" md="3">
         <v-card elevation="2" rounded="lg" class="pa-4 h-100 border-left-primary small-card">
           <div class="d-flex justify-space-between align-start">
@@ -313,4 +498,9 @@ const chartPLSeries = computed(() => [
 .compact-card :deep(.v-card-title) { font-size: 0.95rem !important; padding: 12px 16px !important; }
 .compact-table :deep(th) { font-size: 0.75rem !important; height: 32px !important; background-color: #f5f5f5; }
 .compact-table :deep(td) { padding: 6px 12px !important; height: 36px !important; }
+
+.placeholder-carousel :deep(.v-carousel__controls) { 
+    background: linear-gradient(to top, rgba(0,0,0,0.5), transparent); 
+    padding-bottom: 8px;
+}
 </style>

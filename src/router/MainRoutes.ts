@@ -93,6 +93,13 @@ const MainRoutes = {
             path: '/bill',
             component: () => import('@/views/akuntansi/BillPage.vue')
         },
+        // --- PENAMBAHAN MODUL BARU: PROFILE SETTING ---
+        {
+            name: 'ProfileSettings',
+            path: '/profile-settings',
+            component: () => import('@/views/akuntansi/ProfileSettingPage.vue')
+        },
+        // ------------------------------------------------
     ]
 };
 

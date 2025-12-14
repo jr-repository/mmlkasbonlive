@@ -464,32 +464,42 @@ onMounted(() => {
          <h3 class="text-subtitle-1 font-weight-bold text-primary">All Invoice Records</h3>
         </div>
         
-        <div class="d-flex align-center gap-1" style="min-width: 350px;">
+        <div
+          class="d-flex align-center gap-3"
+          style="min-width: 650px;"
+        >
           <v-select
-              v-model="filterStatus"
-              :items="['ALL', 'DRAFT', 'WAITING_APPROVAL', 'REJECTED', 'SUBMITTED', 'PAID']"
-              label="Filter Status"
-              density="compact"
-              variant="solo-filled"
-              hide-details
-              bg-color="white"
-              class="rounded small-search-input"
-          ></v-select>
-         <v-text-field
-          v-model="search"
-          density="compact"
-          variant="solo-filled"
-          label="Search Data..."
-          hide-details
-          single-line
-          bg-color="white"
-          class="rounded small-search-input"
-         >
-          <template v-slot:prepend-inner>
-           <SearchIcon size="18" class="text-grey-darken-1" />
-          </template>
-         </v-text-field>
+            v-model="filterStatus"
+            :items="['ALL', 'DRAFT', 'WAITING_APPROVAL', 'REJECTED', 'SUBMITTED', 'PAID']"
+            label="Filter Status"
+            density="compact"
+            variant="solo-filled"
+            hide-details
+            bg-color="white"
+            class="rounded filter-field"
+            style="width: 260px;"
+          />
+
+          <v-text-field
+            v-model="search"
+            density="compact"
+            variant="solo-filled"
+            label="Search Data..."
+            hide-details
+            single-line
+            bg-color="white"
+            class="rounded search-field"
+            style="width: 360px;"
+          >
+            <template v-slot:prepend-inner>
+              <SearchIcon
+                size="18"
+                class="text-grey-darken-1 mr-1"
+              />
+            </template>
+          </v-text-field>
         </div>
+
        </div>
 
        <v-data-table 

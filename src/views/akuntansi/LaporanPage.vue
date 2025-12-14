@@ -11,7 +11,9 @@ import {
   CoinIcon,
   CalendarStatsIcon,
   DownloadIcon,
-  FileSpreadsheetIcon
+  FileSpreadsheetIcon,
+  CalendarEventIcon, 
+  RefreshIcon 
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
@@ -24,6 +26,7 @@ const toDate = ref(format(new Date(), 'yyyy-MM-dd'));
 const loading = ref(false);
 const reportData = ref<any[]>([]);
 const activeTab = ref('SUMMARY');
+const reportLoaded = ref(false); // State baru: apakah data sudah pernah dimuat
 
 // --- COMPUTED ---
 const getAccountsByType = (types: string[]) => reportData.value.filter(d => types.includes(d.accountType));
@@ -40,6 +43,9 @@ const netProfit = computed(() => operatingProfit.value + otherIncome.value - oth
 
 // --- METHODS ---
 const fetchReport = async () => {
+  // Hanya fetch jika tidak sedang loading
+  if (loading.value) return; 
+
   loading.value = true;
   try {
     const formattedFrom = format(new Date(fromDate.value), 'dd/MM/yyyy');
@@ -49,20 +55,31 @@ const fetchReport = async () => {
     const json = await res.json();
     if(json.s) {
       reportData.value = json.d.sort((a: any, b: any) => a.accountNo.localeCompare(b.accountNo));
+      reportLoaded.value = true; // Set loaded ke true setelah berhasil
     } else {
       reportData.value = [];
     }
   } catch(e) {
     console.error("Failed to fetch report", e);
+    reportData.value = [];
   } finally {
     loading.value = false;
   }
 };
 
 const fetchDebounced = () => {
-  if (reportTimeout) clearTimeout(reportTimeout);
-  reportTimeout = setTimeout(fetchReport, 600);
+    // Hanya panggil debounced fetch jika laporan sudah pernah dimuat (filter change)
+    if (!reportLoaded.value) return; 
+    
+    if (reportTimeout) clearTimeout(reportTimeout);
+    reportTimeout = setTimeout(fetchReport, 600);
 }
+
+// Fungsi eksplisit untuk trigger pengambilan data
+const triggerReportFetch = () => {
+    fetchReport();
+}
+
 
 // Action Export PDF
 const exportPdf = () => {
@@ -91,10 +108,6 @@ const getLevelStyle = (lvl: number, isParent: boolean) => {
 
 watch([fromDate, toDate], fetchDebounced);
 
-onMounted(() => {
-  fetchReport();
-});
-
 onBeforeUnmount(() => {
   if (reportTimeout) clearTimeout(reportTimeout);
 });
@@ -113,7 +126,7 @@ onBeforeUnmount(() => {
     </div>
     
     <div class="bg-white px-4 py-2 d-flex align-center justify-space-between border-bottom">
-      <v-tabs v-model="activeTab" color="primary" density="compact">
+      <v-tabs v-model="activeTab" color="primary" density="compact" :disabled="!reportLoaded">
         <v-tab value="SUMMARY" class="text-caption font-weight-bold"><ChartPieIcon size="16" class="mr-1"/> Summary</v-tab>
         <v-tab value="DETAIL" class="text-caption font-weight-bold"><FileSpreadsheetIcon size="16" class="mr-1"/> Detailed View</v-tab>
       </v-tabs>
@@ -125,23 +138,102 @@ onBeforeUnmount(() => {
           <span class="text-caption">-</span>
           <input type="date" v-model="toDate" class="small-input date-input" />
         </div>
+        
         <v-btn icon variant="text" size="small" color="primary" @click="fetchReport" :loading="loading">
           <FilterIcon size="20"/>
         </v-btn>
         
         <v-divider vertical class="mx-2"></v-divider>
         
-        <v-btn color="error" variant="outlined" size="small" @click="exportPdf" class="text-caption">
+        <v-btn color="error" variant="outlined" size="small" @click="exportPdf" class="text-caption" :disabled="!reportLoaded || loading">
           <PrinterIcon size="16" class="mr-1"/> PDF
         </v-btn>
-        <v-btn color="success" variant="outlined" size="small" @click="exportExcel" class="text-caption">
+        <v-btn color="success" variant="outlined" size="small" @click="exportExcel" class="text-caption" :disabled="!reportLoaded || loading">
           <DownloadIcon size="16" class="mr-1"/> Excel
         </v-btn>
       </div>
     </div>
   </v-card>
 
-  <v-window v-model="activeTab">
+  <v-row v-if="!reportLoaded">
+    <v-col cols="12" md="7">
+        <v-card elevation="2" rounded="lg" class="pa-0 compact-card overflow-hidden h-100">
+            <v-img
+                src="https://ptmultimitralogistik.com/wp-content/uploads/2023/05/inland_transportation.jpg"
+                aspect-ratio="16/9"
+                height="300"
+                cover
+                gradient="to top right, rgba(0,0,0,.4), rgba(0,0,0,.7)"
+            >
+                <div class="d-flex fill-height align-end justify-start pa-6 text-white">
+                    <div>
+                        <h3 class="text-h5 font-weight-bold mb-2">Generate Laporan Laba Rugi</h3>
+                        <p class="text-subtitle-1 opacity-90">Analisis kinerja finansial dalam satu klik.</p>
+                     <v-btn 
+                          color="primary"
+                          size="large"
+                          class="text-none font-weight-bold mt-3 text-white"
+                          @click="triggerReportFetch"
+                          :loading="loading"
+                          variant="flat"
+                      >
+                          <RefreshIcon size="20" class="mr-2"/> 
+                          {{ loading ? 'Mengambil Data...' : 'Lihat Laporan (7 Hari Terakhir)' }}
+                      </v-btn>
+
+                        </div>
+                </div>
+            </v-img>
+        </v-card>
+    </v-col>
+
+    <v-col cols="12" md="5">
+        <v-card elevation="2" rounded="lg" class="compact-card h-100 bg-blue-grey-lighten-5">
+            <v-card-title class="bg-primary text-white py-3">
+                <ReportAnalyticsIcon size="20" class="mr-2"/> Catatan Penting
+            </v-card-title>
+            <v-card-text class="py-4">
+                <div class="d-flex align-start mb-4">
+                    <v-icon color="warning" class="mt-1 mr-3" size="20">mdi-api</v-icon>
+                    <div>
+                        <h4 class="text-subtitle-2 font-weight-bold mb-1">Integrasi Accurate</h4>
+                        <p class="text-caption text-grey-darken-1">
+                            Laporan ini menarik data riil secara langsung dari Accurate API, sehingga membutuhkan waktu beberapa detik untuk dimuat.
+                        </p>
+                    </div>
+                </div>
+                <div class="d-flex align-start mb-4">
+                    <v-icon color="info" class="mt-1 mr-3" size="20">mdi-calendar-range</v-icon>
+                    <div>
+                        <h4 class="text-subtitle-2 font-weight-bold mb-1">Rentang Tanggal</h4>
+                        <p class="text-caption text-grey-darken-1">
+                            Pilih rentang tanggal yang spesifik untuk memuat laporan, atau gunakan tombol **Lihat Laporan** untuk default 7 hari terakhir.
+                        </p>
+                    </div>
+                </div>
+                <div class="d-flex align-start">
+                    <v-icon color="success" class="mt-1 mr-3" size="20">mdi-file-export</v-icon>
+                    <div>
+                        <h4 class="text-subtitle-2 font-weight-bold mb-1">Export Data</h4>
+                        <p class="text-caption text-grey-darken-1">
+                            Setelah laporan dimuat, Anda dapat mengekspornya dalam format PDF atau Excel.
+                        </p>
+                    </div>
+                </div>
+            </v-card-text>
+        </v-card>
+    </v-col>
+  </v-row>
+
+  <v-row v-else-if="loading && reportLoaded" class="text-center py-5">
+    <v-col cols="12">
+        <v-progress-circular indeterminate color="primary"></v-progress-circular>
+        <div class="mt-2 text-caption text-grey">Updating report data...</div>
+    </v-col>
+  </v-row>
+
+
+  <v-window v-model="activeTab" v-else>
     <v-window-item value="SUMMARY">
       <v-row>
         <v-col cols="12" md="4">

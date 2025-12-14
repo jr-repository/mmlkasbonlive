@@ -440,7 +440,7 @@ onBeforeUnmount(() => {
               class="border rounded-md compact-datatable"
               :items-per-page="50"
               fixed-header
-              style="min-width: 1500px;" 
+              style="min-width: 1600px;" 
             >
               <template v-slot:item.post_date="{ item }">
                 <span class="text-caption">{{ fmtDate(item.post_date) }}</span>

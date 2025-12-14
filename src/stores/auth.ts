@@ -20,8 +20,8 @@ export const useAuthStore = defineStore({
         }
     },
     actions: {
-        async login(username: string, password: string) {
-            const res = await authService.login(username, password);
+        async login(email: string, password: string) {
+            const res = await authService.login(email, password);
             
             if (res.success) {
                 this.user = res.user;
