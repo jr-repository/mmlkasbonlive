@@ -39,13 +39,16 @@ const fetchProfileMinimal = async () => {
 
 // Menentukan sumber gambar
 const displayImage = computed(() => {
-    // 1. Prioritas URL dari Database (yang sudah diformat di backend)
-    if (profileData.value.profile_picture_url && profileData.value.profile_picture_url !== '0') {
+    if (
+        profileData.value?.profile_picture_url &&
+        profileData.value.profile_picture_url !== '0'
+    ) {
         return profileData.value.profile_picture_url;
     }
-    // 2. Fallback Placeholder
-    return null; // Menggunakan null agar avatar menampilkan inisial jika tidak ada gambar
+
+    return 'https://multimitralogistik.id/Backend/uploads/profile/default.png';
 });
+
 
 const navigateToProfile = () => {
     router.push('/profile-settings');

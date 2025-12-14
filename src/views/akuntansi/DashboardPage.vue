@@ -250,7 +250,7 @@ const carouselItems = [
                     <v-card-text class="py-3 px-4 bg-primary-darken-1">
                         <div class="d-flex align-center justify-space-between">
                             <span class="text-caption text-white opacity-80">
-                                <ClockHour4Icon size="16" class="mr-1"/> Last Updated: N/A - Click 'Sync Data' to load.
+                                <ClockHour4Icon size="16" class="mr-1"/> Click 'Sync Data' to load.
                             </span>
                             <v-btn 
                                 color="white" 
@@ -260,7 +260,7 @@ const carouselItems = [
                                 @click="fetchDataExplicit"
                                 :loading="loading"
                             >
-                                <RefreshIcon size="16" class="mr-1"/> Load Data
+                                <RefreshIcon size="16" class="mr-1"/> Sync Data
                             </v-btn>
                         </div>
                     </v-card-text>
@@ -287,7 +287,7 @@ const carouselItems = [
                             <div>
                                 <h4 class="text-subtitle-2 font-weight-bold mb-1">Aksi Cepat</h4>
                                 <p class="text-caption text-grey-darken-1">
-                                    Gunakan tombol **Sync Data** untuk melihat data bulan terakhir, atau atur filter tanggal sesuai kebutuhan Anda.
+                                    Gunakan tombol 'Sync Data' untuk melihat data bulan terakhir, atau atur filter tanggal sesuai kebutuhan Anda.
                                 </p>
                             </div>
                         </div>
@@ -315,8 +315,8 @@ const carouselItems = [
                             <v-list-item-subtitle class="text-caption text-grey">Sistem akan menyimpan snapshot data per akhir bulan.</v-list-item-subtitle>
                         </v-list-item>
                         <v-list-item class="py-2">
-                            <v-list-item-title class="text-caption font-weight-medium">System Maintenance Reminder</v-list-item-title>
-                            <v-list-item-subtitle class="text-caption text-grey">Jadwal maintenance rutin berikutnya: 25 Des 2025.</v-list-item-subtitle>
+                            <v-list-item-title class="text-caption font-weight-medium">System Reminder</v-list-item-title>
+                            <v-list-item-subtitle class="text-caption text-grey">Semangat work.</v-list-item-subtitle>
                         </v-list-item>
                     </v-list>
                 </v-card>

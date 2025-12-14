@@ -22,7 +22,6 @@ const router = useRouter();
 const authStore = useAuthStore();
 const fileInput = ref<HTMLInputElement | null>(null);
 const currentUser = authStore.userData;
-// [FIX] Tambahkan ref untuk form validation
 const createFormRef = ref<any>(null);
 
 const loading = ref(false);
@@ -44,7 +43,6 @@ const submitting = ref(false);
 const createModalOpen = ref(false);
 const creating = ref(false);
 const createForm = reactive({
-  line_no: 0,
   post_date: new Date().toISOString().substr(0, 10),
   eff_date: new Date().toISOString().substr(0, 10),
   cheque_no: '',
@@ -68,18 +66,19 @@ const requiredRule = [(v: any) => !!v || 'Field ini wajib diisi'];
 const requiredDateRule = [(v: any) => !!v || 'Tanggal wajib diisi'];
 
 const headers = [
+  { title: 'No', key: 'line_no', align: 'start' as const, width: '50px' },
   { title: 'Post Date', key: 'post_date', align: 'start' as const, width: '120px' },
-  { title: 'Trx Code', key: 'transaction_code', align: 'start' as const, width: '150px' },
+  { title: 'Eff Date', key: 'eff_date', align: 'start' as const, width: '120px' },
   { title: 'Cheque No', key: 'cheque_no', align: 'start' as const, width: '100px' },
   { title: 'Description', key: 'description', align: 'start' as const, width: '300px' },
   { title: 'Debit', key: 'debit', align: 'end' as const, width: '120px' },
   { title: 'Credit', key: 'credit', align: 'end' as const, width: '120px' },
   { title: 'Balance', key: 'balance', align: 'end' as const, width: '120px' },
+  { title: 'Transaction', key: 'transaction_code', align: 'start' as const, width: '150px' },
   { title: 'Ref no', key: 'reference_no', align: 'start' as const, width: '100px' },
   { title: 'Pymt Type', key: 'payment_type', align: 'start' as const, width: '120px' },
   { title: 'Bank Ref', key: 'bank_reference', align: 'start' as const, width: '120px' },
   { title: 'Status', key: 'status', align: 'center' as const, width: '80px' },
-  // [FIX] Menambahkan created_by dan updater_name
   { title: 'Created By', key: 'creator_name', align: 'start' as const, width: '100px' },
   { title: 'Approved By', key: 'updater_name', align: 'start' as const, width: '100px' },
   { title: 'Action', key: 'actions', align: 'center' as const, sortable: false, width: '100px' },
@@ -166,7 +165,6 @@ const exportData = () => {
 
 const openCreateModal = () => {
   Object.assign(createForm, {
-    line_no: 0,
     post_date: new Date().toISOString().substr(0, 10),
     eff_date: new Date().toISOString().substr(0, 10),
     cheque_no: '',
@@ -183,7 +181,6 @@ const openCreateModal = () => {
 };
 
 const handleCreateSubmit = async () => {
-  // [FIX] Validasi Form
   const { valid } = await createFormRef.value.validate();
   if (!valid) {
     showMsg("Harap lengkapi semua field wajib (*)", "error");
@@ -194,7 +191,7 @@ const handleCreateSubmit = async () => {
   try {
     const payload = {
       ...createForm,
-      // Penting: Pastikan ID user dikirim. Jika null, kirim 0.
+      // line_no dihilangkan dari payload karena diisi otomatis di backend
       created_by: currentUser?.id || 0
     };
     
@@ -213,7 +210,6 @@ const handleCreateSubmit = async () => {
       showMsg(json.message || "Gagal menyimpan transaksi CIMB", "error");
     }
   } catch(e) {
-    // [FIX] Mengubah error message agar lebih informatif
     showMsg("Terjadi kesalahan koneksi server. Cek log server atau pastikan API CreateCimb.php berjalan normal.", "error");
   } finally {
     creating.value = false;
@@ -285,10 +281,19 @@ const handleDelete = async () => {
     }
 };
 
-const fmtMoney = (val: number) => val ? val.toLocaleString('id-ID') : '-';
+const fmtMoney = (val: number) => {
+  if (val === undefined || val === null) return '-';
+  // Format mata uang Rupiah: Rp 100.000,00
+  const formatter = new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return formatter.format(val).replace('IDR', 'Rp');
+};
 const fmtDate = (val: string) => {
     if (!val) return '-';
-    // Format YYYY-MM-DD HH:MM:SS ke DD/MM/YYYY
     const datePart = val.split(' ')[0];
     const parts = datePart.split('-');
     if (parts.length === 3) {
@@ -337,7 +342,7 @@ onBeforeUnmount(() => {
         <div class="d-flex justify-space-between align-center">
           <div>
             <div class="text-caption text-grey">Total Debit</div>
-            <div class="text-subtitle-1 font-weight-bold text-green">Rp {{ fmtMoney(stats?.totals.total_debit || 0) }}</div>
+            <div class="text-subtitle-1 font-weight-bold text-green">{{ fmtMoney(stats?.totals.total_debit || 0) }}</div>
           </div>
           <ArrowDownCircleIcon class="text-green-lighten-2" size="24" />
         </div>
@@ -348,7 +353,7 @@ onBeforeUnmount(() => {
         <div class="d-flex justify-space-between align-center">
           <div>
             <div class="text-caption text-grey">Total Kredit</div>
-            <div class="text-subtitle-1 font-weight-bold text-red">Rp {{ fmtMoney(stats?.totals.total_credit || 0) }}</div>
+            <div class="text-subtitle-1 font-weight-bold text-red">{{ fmtMoney(stats?.totals.total_credit || 0) }}</div>
           </div>
           <ArrowDownCircleIcon class="text-red-lighten-2" size="24" style="transform: rotate(180deg);" />
         </div>
@@ -440,13 +445,16 @@ onBeforeUnmount(() => {
               class="border rounded-md compact-datatable"
               :items-per-page="50"
               fixed-header
-              style="min-width: 1600px;" 
+              style="min-width: 2600px;" 
             >
+              <template v-slot:item.line_no="{ item }">
+                <span class="text-caption font-weight-bold">{{ item.line_no }}</span>
+              </template>
               <template v-slot:item.post_date="{ item }">
                 <span class="text-caption">{{ fmtDate(item.post_date) }}</span>
               </template>
-              <template v-slot:item.transaction_code="{ item }">
-                <span class="font-weight-medium font-mono text-primary text-caption">{{ item.transaction_code }}</span>
+              <template v-slot:item.eff_date="{ item }">
+                <span class="text-caption">{{ fmtDate(item.eff_date) }}</span>
               </template>
               <template v-slot:item.cheque_no="{ item }">
                 <span class="text-caption">{{ item.cheque_no || '-' }}</span>
@@ -464,6 +472,9 @@ onBeforeUnmount(() => {
               </template>
               <template v-slot:item.balance="{ item }">
                 <span class="font-weight-bold text-caption">{{ fmtMoney(item.balance) }}</span>
+              </template>
+              <template v-slot:item.transaction_code="{ item }">
+                <span class="font-weight-medium font-mono text-primary text-caption">{{ item.transaction_code }}</span>
               </template>
               <template v-slot:item.reference_no="{ item }">
                 <span class="text-caption">{{ item.reference_no || '-' }}</span>
@@ -528,13 +539,10 @@ onBeforeUnmount(() => {
       <v-form ref="createFormRef" @submit.prevent="handleCreateSubmit">
         <v-card-text class="pt-4 pb-0">
           <v-row dense>
-            <v-col cols="12" md="4" class="py-1">
-              <v-text-field v-model="createForm.transaction_code" label="Transaction Code *" variant="outlined" density="compact" hint="Harus Unik" persistent-hint class="small-input" :rules="requiredRule"></v-text-field>
-            </v-col>
-            <v-col cols="12" md="4" class="py-1">
+            <v-col cols="12" md="6" class="py-1">
               <v-text-field v-model="createForm.post_date" type="date" label="Post Date *" variant="outlined" density="compact" hide-details class="small-input" :rules="requiredDateRule"></v-text-field>
             </v-col>
-            <v-col cols="12" md="4" class="py-1">
+            <v-col cols="12" md="6" class="py-1">
               <v-text-field v-model="createForm.eff_date" type="date" label="Eff Date" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
             </v-col>
 
@@ -563,7 +571,7 @@ onBeforeUnmount(() => {
             </v-col>
 
             <v-col cols="12" md="6" class="py-1">
-              <v-text-field v-model.number="createForm.line_no" type="number" label="No (Line No)" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
+              <v-text-field v-model="createForm.transaction_code" label="Transaction (Unique ID) *" variant="outlined" density="compact" persistent-hint class="small-input" :rules="requiredRule"></v-text-field>
             </v-col>
             <v-col cols="12" md="6" class="py-1">
               <v-text-field v-model="createForm.reference_no" label="Ref no" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
@@ -594,13 +602,31 @@ onBeforeUnmount(() => {
       
       <v-card-text class="pa-4" style="max-height: 60vh;">
         <v-row dense class="text-caption">
-          <v-col cols="6" class="py-1">
-            <div class="text-overline text-medium-emphasis text-xsmall">Post Date | Eff Date</div>
-            <div class="font-weight-medium">{{ fmtDate(selectedItem.post_date) }} | {{ fmtDate(selectedItem.eff_date) }}</div>
+          
+          <v-col cols="4" class="py-1">
+            <div class="text-overline text-medium-emphasis text-xsmall">No (Line No)</div>
+            <div class="font-weight-medium">{{ selectedItem.line_no || '-' }}</div>
           </v-col>
-          <v-col cols="6" class="py-1">
-            <div class="text-overline text-medium-emphasis text-xsmall">Cheque No | Ref No</div>
-            <div class="font-weight-medium">{{ selectedItem.cheque_no || '-' }} | {{ selectedItem.reference_no || '-' }}</div>
+          <v-col cols="4" class="py-1">
+            <div class="text-overline text-medium-emphasis text-xsmall">Post Date</div>
+            <div class="font-weight-medium">{{ fmtDate(selectedItem.post_date) }}</div>
+          </v-col>
+          <v-col cols="4" class="py-1">
+            <div class="text-overline text-medium-emphasis text-xsmall">Eff Date</div>
+            <div class="font-weight-medium">{{ fmtDate(selectedItem.eff_date) }}</div>
+          </v-col>
+
+          <v-col cols="4" class="py-1">
+            <div class="text-overline text-medium-emphasis text-xsmall">Cheque No</div>
+            <div class="font-weight-medium">{{ selectedItem.cheque_no || '-' }}</div>
+          </v-col>
+          <v-col cols="4" class="py-1">
+            <div class="text-overline text-medium-emphasis text-xsmall">Payment Type</div>
+            <div class="font-weight-medium">{{ selectedItem.payment_type || '-' }}</div>
+          </v-col>
+          <v-col cols="4" class="py-1">
+            <div class="text-overline text-medium-emphasis text-xsmall">Bank Ref</div>
+            <div class="font-weight-medium">{{ selectedItem.bank_reference || '-' }}</div>
           </v-col>
 
           <v-col cols="12" class="py-1">
@@ -621,6 +647,15 @@ onBeforeUnmount(() => {
           <v-col cols="4" class="py-1">
             <div class="text-overline text-medium-emphasis text-xsmall">Balance</div>
             <div class="font-weight-bold text-primary text-subtitle-2">{{ fmtMoney(selectedItem.balance) }}</div>
+          </v-col>
+
+          <v-col cols="6" class="py-1">
+            <div class="text-overline text-medium-emphasis text-xsmall">Transaction Code</div>
+            <div class="font-weight-medium">{{ selectedItem.transaction_code }}</div>
+          </v-col>
+          <v-col cols="6" class="py-1">
+            <div class="text-overline text-medium-emphasis text-xsmall">Ref No</div>
+            <div class="font-weight-medium">{{ selectedItem.reference_no || '-' }}</div>
           </v-col>
         </v-row>
 
@@ -726,12 +761,10 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* ======================== GENERAL COMPACT STYLES (MATCHING REKON PAGE) ======================== */
 .font-mono { font-family: 'Roboto Mono', monospace; }
 .border-blue { border-left: 3px solid #42a5f5; }
 .border-green { border-left: 3px solid #66bb6a; }
 
-/* Global Card & Text */
 .compact-card :deep(.v-card-title) {
     font-size: 0.9rem !important;
     padding: 10px 16px !important;
@@ -741,12 +774,10 @@ onBeforeUnmount(() => {
 }
 .text-xsmall { font-size: 0.65rem !important; }
 
-/* Scrollable container for data table */
 .v-data-table-container-scrollable {
     overflow-x: auto;
 }
 
-/* Summary Card */
 .compact-summary-card {
     border: 1px solid rgba(0,0,0,0.12) !important;
 }
@@ -757,7 +788,6 @@ onBeforeUnmount(() => {
     font-size: 1rem !important;
 }
 
-/* Data Table */
 .compact-datatable :deep(th) {
     font-size: 0.75rem !important;
     height: 35px !important;
@@ -769,14 +799,12 @@ onBeforeUnmount(() => {
     white-space: nowrap;
 }
 
-/* Form Inputs (Used in filter and modals) */
 .small-input :deep(.v-field) { min-height: 36px !important; }
 .small-input :deep(.v-label) { font-size: 0.8rem; }
 .small-input :deep(input) { font-size: 0.8rem; }
 .text-right-input :deep(input) { text-align: right; }
 .text-right-input :deep(.v-field__prefix) { font-size: 0.8rem; }
 
-/* Textarea input (in modal) */
 .small-textarea :deep(.v-field__input) { 
     padding-top: 6px !important; 
     padding-bottom: 6px !important; 
@@ -785,7 +813,6 @@ onBeforeUnmount(() => {
 }
 .small-textarea :deep(.v-label) { font-size: 0.8rem; }
 
-/* File Input (in modal) */
 .small-file-input :deep(.v-field) { 
     min-height: 36px !important; 
 }
@@ -801,7 +828,6 @@ onBeforeUnmount(() => {
     transform: translateY(-100%) scale(0.75); 
 }
 
-/* Modal Styling (Matching Kasbon) */
 .small-dialog-card :deep(.v-card-title) {
     padding: 10px 16px !important;
 }

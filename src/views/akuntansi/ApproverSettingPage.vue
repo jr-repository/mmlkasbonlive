@@ -56,6 +56,23 @@ onMounted(fetchUsers);
 </script>
 
 <template>
+  <v-card elevation="4" rounded="lg" class="mb-4 overflow-hidden compact-header-card">
+            <div class="bg-gradient-smooth px-4 py-3">
+            <div class="d-flex align-center gap-2">
+                <div class="bg-white rounded-circle pa-2 d-flex">
+                <UserCheckIcon size="24" class="text-primary" />
+                </div>
+                <div>
+                <h2 class="text-h6 font-weight-bold text-white mb-0">
+                    Pengaturan Hak Akses Approver
+                </h2>
+                <div class="text-caption text-white opacity-90">
+                    Kelola pengguna yang memiliki izin untuk menyetujui (approve) berbagai modul.
+                </div>
+                </div>
+            </div>
+            </div>
+        </v-card>
   <v-row class="justify-center mt-2">
     <v-col cols="12" md="12">
       <v-alert color="info" variant="tonal" class="mb-4 pa-2" border="start">
@@ -185,5 +202,14 @@ onMounted(fetchUsers);
     font-size: 0.65rem !important;
     padding-left: 6px !important;
     padding-right: 6px !important;
+}
+/* Tambahan Style Hanya untuk Gradient Header */
+.bg-gradient-smooth { 
+    background: linear-gradient(135deg, #1565C0 0%, #42A5F5 60%, #BBDEFB 100%); 
+}
+
+/* Memastikan card header gradient memiliki elevasi dan tampilan yang rapi */
+.compact-header-card {
+    border: none !important;
 }
 </style>
