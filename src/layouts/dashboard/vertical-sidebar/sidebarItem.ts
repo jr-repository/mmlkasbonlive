@@ -132,6 +132,39 @@ const sidebarItem: menu[] = [
         icon: SettingsIcon,
         to: '/settings'
     },
+
+    {
+    title: 'Payroll System',
+    icon: 'LayoutDashboardIcon', // Sesuaikan icon yang tersedia (misal: CashIcon atau CalculatorIcon)
+    to: '#',
+    children: [
+        {
+            title: 'Master Data Karyawan',
+            icon: 'CircleIcon',
+            to: '/payroll/master-karyawan'
+        },
+        {
+            title: 'Komponen Gaji',
+            icon: 'CircleIcon',
+            to: '/payroll/komponen-gaji'
+        },
+        {
+            title: 'Absensi Fingerprint',
+            icon: 'CircleIcon',
+            to: '/payroll/absensi'
+        },
+        {
+            title: 'Setting & Proses Payroll',
+            icon: 'CircleIcon',
+            to: '/payroll/proses'
+        },
+        {
+            title: 'Laporan & Slip Gaji',
+            icon: 'CircleIcon',
+            to: '/payroll/laporan'
+        }
+    ]
+},
 ];
 
 export default sidebarItem;

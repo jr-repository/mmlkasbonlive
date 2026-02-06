@@ -100,6 +100,32 @@ const MainRoutes = {
             component: () => import('@/views/akuntansi/ProfileSettingPage.vue')
         },
         // ------------------------------------------------
+
+        {
+            name: 'MasterKaryawan',
+            path: '/payroll/master-karyawan',
+            component: () => import('@/views/payroll/EmployeePage.vue')
+        },
+        {
+            name: 'KomponenGaji',
+            path: '/payroll/komponen-gaji',
+            component: () => import('@/views/payroll/SalaryComponentPage.vue')
+        },
+        {
+            name: 'AbsensiPayroll',
+            path: '/payroll/absensi',
+            component: () => import('@/views/payroll/AttendancePage.vue')
+        },
+        {
+            name: 'ProsesPayroll',
+            path: '/payroll/proses',
+            component: () => import('@/views/payroll/PayrollProcessPage.vue')
+        },
+        {
+            name: 'LaporanPayroll',
+            path: '/payroll/laporan',
+            component: () => import('@/views/payroll/PayrollReportPage.vue')
+        },
     ]
 };
 
