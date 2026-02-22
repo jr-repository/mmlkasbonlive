@@ -67,26 +67,8 @@
                   <td class="text-right text-caption font-weight-bold text-primary">{{ formatPrice(h.total_net) }}</td>
                   <td class="text-center">
                     <div class="d-flex justify-center align-center gap-2">
-                      <v-btn 
-                        size="x-small" 
-                        color="primary" 
-                        variant="flat" 
-                        class="text-none font-weight-bold px-3" 
-                        @click="selectPeriod(h)"
-                      >
-                        Pilih & Buka
-                      </v-btn>
-                      
-                      <v-btn 
-                        size="small" 
-                        color="success" 
-                        variant="flat"
-                        class="text-none font-weight-bold"
-                        :href="`${API_REKAP}?id=${h.id}`" 
-                        target="_blank"
-                      >
-                        📗 EXCEL
-                      </v-btn>
+                      <v-btn size="x-small" color="primary" variant="flat" class="text-none font-weight-bold px-3" @click="selectPeriod(h)">Pilih & Buka</v-btn>
+                      <v-btn size="small" color="success" variant="flat" class="text-none font-weight-bold" :href="`${API_REKAP}?id=${h.id}`" target="_blank">📗 EXCEL</v-btn>
                     </div>
                   </td>
                 </tr>
@@ -101,17 +83,7 @@
                         <h3 class="text-subtitle-1 font-weight-bold text-blue-darken-3 mb-1">Rincian Slip: {{ selectedHistory.period_month }}</h3>
                         <p class="text-xsmall text-blue-darken-2 mb-0">Daftar rincian gaji final untuk seluruh karyawan.</p>
                     </div>
-                    <v-text-field 
-                        v-model="search" 
-                        placeholder="🔍 Cari Nama / NIK..." 
-                        density="compact" 
-                        hide-details 
-                        variant="flat" 
-                        bg-color="white"
-                        rounded="pill"
-                        style="max-width: 300px;"
-                        class="small-input border"
-                    ></v-text-field>
+                    <v-text-field v-model="search" placeholder="🔍 Cari Nama / NIK..." density="compact" hide-details variant="flat" bg-color="white" rounded="pill" style="max-width: 300px;" class="small-input border"></v-text-field>
                 </div>
 
                 <v-table density="compact" class="modern-table border rounded-lg overflow-hidden">
@@ -127,9 +99,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-if="detailsLoading">
-                          <td colspan="7" class="text-center py-10"><v-progress-circular indeterminate color="primary"></v-progress-circular></td>
-                        </tr>
+                        <tr v-if="detailsLoading"><td colspan="7" class="text-center py-10"><v-progress-circular indeterminate color="primary"></v-progress-circular></td></tr>
                         <tr v-for="d in filteredDetails" :key="d.id" class="hover-row">
                             <td>
                                 <div class="py-1">
@@ -143,24 +113,11 @@
                             <td class="text-right text-caption text-error font-weight-bold">-{{ formatPrice(Number(d.attendance_penalty) + Number(d.deductions)) }}</td>
                             <td class="text-right font-weight-bold text-subtitle-2 text-primary">{{ formatPrice(d.net_salary) }}</td>
                             <td class="text-center">
-                                <v-btn 
-                                  color="error" 
-                                  variant="tonal" 
-                                  size="small" 
-                                  class="text-none font-weight-bold"
-                                  :href="`${API_SLIP}?detail_id=${d.id}`" 
-                                  target="_blank"
-                                >
-                                  📕 PDF
-                                </v-btn>
+                                <v-btn color="error" variant="tonal" size="small" class="text-none font-weight-bold" :href="`${API_SLIP}?detail_id=${d.id}`" target="_blank">📕 PDF</v-btn>
                             </td>
                         </tr>
                     </tbody>
                 </v-table>
-            </div>
-            <div v-else class="text-center py-16 opacity-60">
-                <span style="font-size: 50px;">🔍</span>
-                <div class="mt-4 text-subtitle-1 font-weight-medium text-grey-darken-1">Pilih periode di tab Riwayat.</div>
             </div>
           </v-window-item>
         </v-window>
@@ -182,44 +139,39 @@ const history = ref([]);
 const details = ref([]);
 const selectedHistory = ref(null);
 const search = ref('');
-
 const historyLoading = ref(false);
 const detailsLoading = ref(false);
 
 const loadHistory = async () => {
-  historyLoading.value = true;
-  try {
-    const response = await fetch(`${API_BASE}/GetHistory.php`).then(res => res.json());
-    if (response.s) history.value = response.d;
-  } catch (error) { console.error(error); }
-  finally { historyLoading.value = false; }
+  historyLoading.value = true;
+  try {
+    const response = await fetch(`${API_BASE}/GetHistory.php`).then(res => res.json());
+    if (response.s) history.value = response.d;
+  } catch (error) { console.error(error); }
+  finally { historyLoading.value = false; }
 };
 
 const selectPeriod = async (h) => {
-  selectedHistory.value = h;
-  tab.value = 'slips';
-  detailsLoading.value = true;
-  try {
-    const response = await fetch(`${API_BASE}/GetDetails.php?id=${h.id}`).then(res => res.json());
-    if (response.s) details.value = response.d;
-  } catch (error) { console.error(error); }
-  finally { detailsLoading.value = false; }
+  selectedHistory.value = h;
+  tab.value = 'slips';
+  detailsLoading.value = true;
+  try {
+    const response = await fetch(`${API_BASE}/GetDetails.php?id=${h.id}`).then(res => res.json());
+    if (response.s) details.value = response.d;
+  } catch (error) { console.error(error); }
+  finally { detailsLoading.value = false; }
 };
 
 const filteredDetails = computed(() => {
-  if (!details.value) return [];
-  return details.value.filter(d => 
-    d.name.toLowerCase().includes(search.value.toLowerCase()) || 
-    d.nik.includes(search.value)
-  );
+  if (!details.value) return [];
+  return details.value.filter(d => d.name.toLowerCase().includes(search.value.toLowerCase()) || d.nik.includes(search.value));
 });
 
 const formatPrice = (value) => 'Rp ' + Number(value).toLocaleString('id-ID');
 const formatDate = (dateStr) => {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
+  if (!dateStr) return '-';
+  return new Date(dateStr).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
 };
-
 onMounted(loadHistory);
 </script>
 

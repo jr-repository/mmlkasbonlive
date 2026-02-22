@@ -10,6 +10,7 @@ import {
   ChevronDownIcon,
   AlertCircleIcon,
   XIcon,
+  TrashIcon, // Tambahan icon baru
   CheckIcon
 } from 'vue-tabler-icons';
 
@@ -65,6 +66,28 @@ const uploadFile = async () => {
     alert("Server Error"); 
   } finally { 
     loading.value = false; 
+  }
+};
+
+const downloadLog = (id) => {
+  window.open(`${API}/Download.php?id=${id}`, '_blank');
+};
+
+const deleteLog = async (id) => {
+  if (!confirm("Apakah Anda yakin ingin menghapus riwayat ini? File di server dan data absensi terkait akan dihapus permanen.")) return;
+  
+  try {
+    const r = await fetch(`${API}/Delete.php`, { 
+      method: 'POST', 
+      body: JSON.stringify({ id }) 
+    }).then(res => res.json());
+    
+    if (r.s) {
+      alert(r.message);
+      await load();
+    } else alert(r.message);
+  } catch (e) {
+    alert("Gagal menghapus data.");
   }
 };
 
@@ -169,30 +192,41 @@ onMounted(load);
                   <th class="text-caption font-weight-bold text-uppercase py-2">Waktu Upload</th>
                   <th class="text-caption font-weight-bold text-uppercase py-2">Nama File</th>
                   <th class="text-caption font-weight-bold text-uppercase py-2 text-right">Total Berhasil</th>
+                  <th class="text-caption font-weight-bold text-uppercase py-2 text-center" width="100">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 <template v-for="log in logs" :key="log.id">
-                  <tr @click="toggle(log.id)" style="cursor: pointer" class="log-row">
-                    <td>
+                  <tr class="log-row">
+                    <td @click="toggle(log.id)" style="cursor: pointer">
                       <component :is="isEx(log.id) ? ChevronDownIcon : ChevronRightIcon" size="18" class="text-primary" />
                     </td>
-                    <td class="text-caption text-medium-emphasis">{{ formatDate(log.created_at) }}</td>
-                    <td>
+                    <td class="text-caption text-medium-emphasis" @click="toggle(log.id)" style="cursor: pointer">{{ formatDate(log.created_at) }}</td>
+                    <td @click="toggle(log.id)" style="cursor: pointer">
                       <div class="d-flex align-center">
                         <FileSpreadsheetIcon size="16" class="mr-2 text-success" />
                         <span class="text-caption font-weight-medium">{{ log.file_name }}</span>
                       </div>
                     </td>
-                    <td class="text-right">
+                    <td class="text-right" @click="toggle(log.id)" style="cursor: pointer">
                       <v-chip size="x-small" color="success" variant="tonal" class="font-weight-bold">
                         {{ log.total_rows }} Rows
                       </v-chip>
                     </td>
+                    <td class="text-center">
+                      <div class="d-flex justify-center gap-1">
+                        <v-btn icon size="x-small" variant="text" color="primary" @click="downloadLog(log.id)">
+                          <DownloadIcon size="16" />
+                        </v-btn>
+                        <v-btn icon size="x-small" variant="text" color="error" @click="deleteLog(log.id)">
+                          <TrashIcon size="16" />
+                        </v-btn>
+                      </div>
+                    </td>
                   </tr>
 
                   <tr v-if="isEx(log.id)">
-                    <td colspan="4" class="pa-4 bg-grey-lighten-5">
+                    <td colspan="5" class="pa-4 bg-grey-lighten-5">
                       <v-card variant="outlined" class="rounded-lg bg-white overflow-hidden">
                         <v-table density="compact" class="inner-table">
                           <thead>
@@ -219,7 +253,7 @@ onMounted(load);
                   </tr>
                 </template>
                 <tr v-if="logs.length === 0">
-                  <td colspan="4" class="text-center py-10 text-caption text-medium-emphasis">Belum ada riwayat sinkronisasi.</td>
+                  <td colspan="5" class="text-center py-10 text-caption text-medium-emphasis">Belum ada riwayat sinkronisasi.</td>
                 </tr>
               </tbody>
             </v-table>
@@ -265,51 +299,20 @@ onMounted(load);
 </template>
 
 <style scoped>
-/* Gradient Themes */
-.bg-gradient-smooth {
-  background: linear-gradient(135deg, #1565C0 0%, #42A5F5 60%, #BBDEFB 100%);
+/* Tambahkan style untuk gap agar tombol aksi tidak menempel */
+.gap-1 {
+  gap: 4px;
 }
-.bg-gradient-danger {
-  background: linear-gradient(135deg, #D32F2F 0%, #EF5350 60%, #FFCDD2 100%);
-}
-
-.border-dashed {
-  border: 1px dashed #90CAF9 !important;
-}
-
-/* Table Compaction */
-.compact-data-table :deep(th) {
-  height: 40px !important;
-  font-size: 0.75rem !important;
-}
-.compact-data-table :deep(td) {
-  height: 44px !important;
-  font-size: 0.75rem !important;
-}
-
-.log-row:hover {
-  background-color: #f1f5f9 !important;
-}
-
-.inner-table :deep(th) {
-  background-color: #f8fafc;
-  height: 32px !important;
-}
-
-/* Input Styles */
-.small-input :deep(.v-field) {
-  border-radius: 8px;
-}
-
-.text-xsmall {
-  font-size: 0.65rem !important;
-}
-
-.max-h-300 {
-  max-height: 300px;
-}
-
-.gap-2 {
-  gap: 8px;
-}
+/* Style lainnya tetap sama seperti kode Anda sebelumnya */
+.bg-gradient-smooth { background: linear-gradient(135deg, #1565C0 0%, #42A5F5 60%, #BBDEFB 100%); }
+.bg-gradient-danger { background: linear-gradient(135deg, #D32F2F 0%, #EF5350 60%, #FFCDD2 100%); }
+.border-dashed { border: 1px dashed #90CAF9 !important; }
+.compact-data-table :deep(th) { height: 40px !important; font-size: 0.75rem !important; }
+.compact-data-table :deep(td) { height: 44px !important; font-size: 0.75rem !important; }
+.log-row:hover { background-color: #f1f5f9 !important; }
+.inner-table :deep(th) { background-color: #f8fafc; height: 32px !important; }
+.small-input :deep(.v-field) { border-radius: 8px; }
+.text-xsmall { font-size: 0.65rem !important; }
+.max-h-300 { max-height: 300px; }
+.gap-2 { gap: 8px; }
 </style>
