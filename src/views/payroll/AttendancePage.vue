@@ -10,7 +10,7 @@ import {
   ChevronDownIcon,
   AlertCircleIcon,
   XIcon,
-  TrashIcon, // Tambahan icon baru
+  TrashIcon,
   CheckIcon
 } from 'vue-tabler-icons';
 
@@ -25,6 +25,16 @@ const exRows = ref([]);
 const details = reactive({});
 const errs = ref([]);
 const errDialog = ref(false);
+const importDialog = ref(false);
+
+// State untuk Periode Dinamis
+const availablePeriods = [
+  'Januari 2026', 'Februari 2026', 'Maret 2026', 
+  'April 2026', 'Mei 2026', 'Juni 2026', 
+  'Juli 2026', 'Agustus 2026', 'September 2026', 
+  'Oktober 2026', 'November 2026', 'Desember 2026'
+];
+const selectedPeriod = ref('Februari 2026');
 
 // --- METHODS ---
 const load = async () => {
@@ -48,9 +58,16 @@ const isEx = (id) => exRows.value.includes(id);
 
 const uploadFile = async () => {
   if (!file.value) return;
+  if (!selectedPeriod.value) {
+    alert("Silahkan pilih periode absensi terlebih dahulu!");
+    return;
+  }
+  
   loading.value = true;
   const fd = new FormData();
   fd.append('file', file.value[0] || file.value);
+  fd.append('period_month', selectedPeriod.value);
+  
   try {
     const r = await fetch(`${API}/Sync.php`, { method: 'POST', body: fd }).then(res => res.json());
     if (r.s) {
@@ -59,6 +76,7 @@ const uploadFile = async () => {
         errDialog.value = true; 
       }
       file.value = null;
+      importDialog.value = false;
       await load();
       if (logs.value.length > 0) toggle(logs.value[0].id);
     } else alert(r.message);
@@ -104,164 +122,187 @@ onMounted(load);
 
 <template>
   <v-row>
-    <v-col cols="12">
-      <BaseBreadcrumb title="Absensi Fingerprint" :breadcrumbs="[{title: 'Payroll', disabled: false}, {title: 'Absensi', disabled: true}]"></BaseBreadcrumb>
-      
+    <v-col cols="12">      
       <v-card elevation="4" rounded="lg" class="mb-4 overflow-hidden compact-header-card">
         <div class="bg-gradient-smooth px-4 py-3">
-          <div class="d-flex align-center gap-2">
+          <div class="d-flex align-center justify-space-between gap-2">
             <div>
               <h2 class="text-h6 font-weight-bold text-white mb-0">Attendance Synchronization</h2>
               <div class="text-caption text-white opacity-90">
                 Sync fingerprint data with system records based on Name and Department.
               </div>
             </div>
+            <v-btn color="white" class="text-primary font-weight-bold elevation-2" prepend-icon="mdi-cloud-upload" @click="importDialog = true">
+              Import Absensi
+            </v-btn>
           </div>
         </div>
       </v-card>
 
-      <v-row>
-        <v-col cols="12" md="4">
-          <v-card elevation="4" rounded="lg" class="border overflow-hidden h-100">
-            <div class="bg-gradient-smooth px-4 py-3 d-flex align-center">
-              <CloudUploadIcon size="18" class="text-white mr-2" />
-              <h3 class="text-subtitle-1 font-weight-bold text-white">Import Absensi</h3>
-            </div>
-            
-            <v-card-text class="pa-6 bg-grey-lighten-5 h-100">
-              <div class="mb-4 bg-blue-lighten-5 pa-3 rounded-lg border-dashed">
-                <p class="text-caption text-blue-darken-3 mb-0">
-                  Pastikan file Excel menggunakan format terbaru. Sistem akan mencocokkan <b>Nama</b> dan <b>Departemen</b> secara otomatis.
-                </p>
-              </div>
+      <v-card elevation="4" rounded="lg" class="border overflow-hidden">
+        <div class="bg-grey-lighten-4 px-4 py-3 d-flex align-center">
+          <HistoryIcon size="18" class="text-primary mr-2" />
+          <h3 class="text-subtitle-1 font-weight-bold text-grey-darken-3">Riwayat Sinkronisasi</h3>
+        </div>
 
-              <v-label class="mb-2 text-caption font-weight-bold text-grey-darken-2">Pilih File Excel (.xlsx)</v-label>
-              <v-file-input 
-                v-model="file" 
-                variant="outlined" 
-                density="compact" 
-                accept=".xlsx" 
-                prepend-icon="" 
-                color="primary"
-                bg-color="white"
-                prepend-inner-icon="mdi-file-excel" 
-                placeholder="Upload file fingerprint"
-                hide-details 
-                class="mb-4 small-input"
-              ></v-file-input>
+        <v-table density="compact" class="compact-data-table modern-table hover">
+          <thead>
+            <tr class="bg-grey-lighten-3">
+              <th width="40"></th>
+              <th class="text-caption font-weight-bold text-uppercase py-2">Waktu Upload</th>
+              <th class="text-caption font-weight-bold text-uppercase py-2">Periode</th>
+              <th class="text-caption font-weight-bold text-uppercase py-2">Nama File</th>
+              <th class="text-caption font-weight-bold text-uppercase py-2 text-right">Total Berhasil</th>
+              <th class="text-caption font-weight-bold text-uppercase py-2 text-center" width="120">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="log in logs" :key="log.id">
+              <tr class="log-row" :class="{ 'row-posted': log.is_posted > 0 }">
+                <td @click="toggle(log.id)" style="cursor: pointer">
+                  <component :is="isEx(log.id) ? ChevronDownIcon : ChevronRightIcon" size="18" class="text-primary" />
+                </td>
+                <td class="text-caption" @click="toggle(log.id)" style="cursor: pointer">{{ formatDate(log.created_at) }}</td>
+                
+                <td class="text-caption font-weight-bold text-primary position-relative" @click="toggle(log.id)" style="cursor: pointer">
+                  {{ log.period_month || '-' }}
+                  <div v-if="log.is_posted > 0" class="posted-stamp">
+                    <img src="https://multimitralogistik.id/Backend/uploads/posted.png" alt="POSTED" />
+                  </div>
+                </td>
 
-              <v-btn 
-                :loading="loading" 
-                color="primary" 
-                block 
-                elevation="2"
-                class="text-none font-weight-bold mb-3"
-                @click="uploadFile" 
-                :disabled="!file"
-              >
-                <CloudUploadIcon size="18" class="mr-2"/> Proses Import Data
-              </v-btn>
+                <td @click="toggle(log.id)" style="cursor: pointer">
+                  <div class="d-flex align-center">
+                    <FileSpreadsheetIcon size="16" class="mr-2 text-success" />
+                    <span class="text-caption font-weight-medium">{{ log.file_name }}</span>
+                  </div>
+                </td>
+                <td class="text-right" @click="toggle(log.id)" style="cursor: pointer">
+                  <v-chip size="x-small" color="success" variant="tonal" class="font-weight-bold">
+                    {{ log.total_rows }} Rows
+                  </v-chip>
+                </td>
+                <td class="text-center">
+                  <div class="d-flex justify-center gap-1">
+                    <v-btn icon size="x-small" variant="text" color="primary" @click="downloadLog(log.id)">
+                      <DownloadIcon size="16" />
+                    </v-btn>
+                    <v-btn icon size="x-small" variant="text" color="error" @click="deleteLog(log.id)">
+                      <TrashIcon size="16" />
+                    </v-btn>
+                  </div>
+                </td>
+              </tr>
 
-              <v-divider class="my-4"></v-divider>
-
-              <v-btn 
-                variant="text" 
-                color="secondary" 
-                block 
-                class="text-none text-caption font-weight-medium" 
-                :href="TEMPLATE_URL" 
-                target="_blank"
-              >
-                <DownloadIcon size="16" class="mr-1"/> Download Format Template
-              </v-btn>
-            </v-card-text>
-          </v-card>
-        </v-col>
-
-        <v-col cols="12" md="8">
-          <v-card elevation="4" rounded="lg" class="border overflow-hidden">
-            <div class="bg-gradient-smooth px-4 py-3 d-flex align-center">
-              <HistoryIcon size="18" class="text-white mr-2" />
-              <h3 class="text-subtitle-1 font-weight-bold text-white">Riwayat Sinkronisasi</h3>
-            </div>
-
-            <v-table density="compact" class="compact-data-table modern-table hover">
-              <thead>
-                <tr class="bg-grey-lighten-4">
-                  <th width="40"></th>
-                  <th class="text-caption font-weight-bold text-uppercase py-2">Waktu Upload</th>
-                  <th class="text-caption font-weight-bold text-uppercase py-2">Nama File</th>
-                  <th class="text-caption font-weight-bold text-uppercase py-2 text-right">Total Berhasil</th>
-                  <th class="text-caption font-weight-bold text-uppercase py-2 text-center" width="100">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template v-for="log in logs" :key="log.id">
-                  <tr class="log-row">
-                    <td @click="toggle(log.id)" style="cursor: pointer">
-                      <component :is="isEx(log.id) ? ChevronDownIcon : ChevronRightIcon" size="18" class="text-primary" />
-                    </td>
-                    <td class="text-caption text-medium-emphasis" @click="toggle(log.id)" style="cursor: pointer">{{ formatDate(log.created_at) }}</td>
-                    <td @click="toggle(log.id)" style="cursor: pointer">
-                      <div class="d-flex align-center">
-                        <FileSpreadsheetIcon size="16" class="mr-2 text-success" />
-                        <span class="text-caption font-weight-medium">{{ log.file_name }}</span>
-                      </div>
-                    </td>
-                    <td class="text-right" @click="toggle(log.id)" style="cursor: pointer">
-                      <v-chip size="x-small" color="success" variant="tonal" class="font-weight-bold">
-                        {{ log.total_rows }} Rows
-                      </v-chip>
-                    </td>
-                    <td class="text-center">
-                      <div class="d-flex justify-center gap-1">
-                        <v-btn icon size="x-small" variant="text" color="primary" @click="downloadLog(log.id)">
-                          <DownloadIcon size="16" />
-                        </v-btn>
-                        <v-btn icon size="x-small" variant="text" color="error" @click="deleteLog(log.id)">
-                          <TrashIcon size="16" />
-                        </v-btn>
-                      </div>
-                    </td>
-                  </tr>
-
-                  <tr v-if="isEx(log.id)">
-                    <td colspan="5" class="pa-4 bg-grey-lighten-5">
-                      <v-card variant="outlined" class="rounded-lg bg-white overflow-hidden">
-                        <v-table density="compact" class="inner-table">
-                          <thead>
-                            <tr class="bg-blue-grey-lighten-5">
-                              <th class="text-xsmall font-weight-bold">Nama Karyawan</th>
-                              <th class="text-xsmall font-weight-bold">Dept</th>
-                              <th class="text-xsmall font-weight-bold text-center">Terlambat</th>
-                              <th class="text-xsmall font-weight-bold text-center">Absen</th>
-                              <th class="text-xsmall font-weight-bold text-center">Lembur</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr v-for="d in details[log.id]" :key="d.id">
-                              <td class="text-caption font-weight-bold">{{ d.name }}</td>
-                              <td><v-chip size="x-small" variant="flat" color="grey-lighten-3" class="text-caption">{{ d.dept }}</v-chip></td>
-                              <td class="text-center text-caption">{{ d.late_min }}m</td>
-                              <td class="text-center text-caption text-error font-weight-bold">{{ d.absence_days }}h</td>
-                              <td class="text-center text-caption text-success font-weight-bold">{{ d.overtime_hours }}j</td>
-                            </tr>
-                          </tbody>
-                        </v-table>
-                      </v-card>
-                    </td>
-                  </tr>
-                </template>
-                <tr v-if="logs.length === 0">
-                  <td colspan="5" class="text-center py-10 text-caption text-medium-emphasis">Belum ada riwayat sinkronisasi.</td>
-                </tr>
-              </tbody>
-            </v-table>
-          </v-card>
-        </v-col>
-      </v-row>
+              <tr v-if="isEx(log.id)">
+                <td colspan="6" class="pa-4 bg-grey-lighten-5">
+                  <v-card variant="outlined" class="rounded-lg bg-white overflow-hidden">
+                    <v-table density="compact" class="inner-table">
+                      <thead>
+                        <tr class="bg-blue-grey-lighten-5">
+                          <th class="text-xsmall font-weight-bold">Nama Karyawan</th>
+                          <th class="text-xsmall font-weight-bold">Dept</th>
+                          <th class="text-xsmall font-weight-bold text-center">Terlambat</th>
+                          <th class="text-xsmall font-weight-bold text-center">Absen</th>
+                          <th class="text-xsmall font-weight-bold text-center">Lembur</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="d in details[log.id]" :key="d.id">
+                          <td class="text-caption font-weight-bold">{{ d.name }}</td>
+                          <td><v-chip size="x-small" variant="flat" color="grey-lighten-3" class="text-caption">{{ d.dept }}</v-chip></td>
+                          <td class="text-center text-caption">{{ d.late_min }}m</td>
+                          <td class="text-center text-caption text-error font-weight-bold">{{ d.absence_days }}h</td>
+                          <td class="text-center text-caption text-success font-weight-bold">{{ d.overtime_hours }}j</td>
+                        </tr>
+                      </tbody>
+                    </v-table>
+                  </v-card>
+                </td>
+              </tr>
+            </template>
+            <tr v-if="logs.length === 0">
+              <td colspan="6" class="text-center py-10 text-caption text-medium-emphasis">Belum ada riwayat sinkronisasi.</td>
+            </tr>
+          </tbody>
+        </v-table>
+      </v-card>
     </v-col>
   </v-row>
+
+  <v-dialog v-model="importDialog" max-width="450" transition="dialog-bottom-transition">
+    <v-card rounded="lg" class="overflow-hidden">
+      <div class="bg-gradient-smooth px-4 py-3 d-flex align-center justify-space-between">
+        <div class="d-flex align-center">
+          <CloudUploadIcon size="18" class="text-white mr-2" />
+          <h3 class="text-subtitle-1 font-weight-bold text-white">Import Absensi</h3>
+        </div>
+        <v-btn icon variant="text" color="white" size="small" @click="importDialog = false">
+          <XIcon size="18" />
+        </v-btn>
+      </div>
+      
+      <v-card-text class="pa-6 bg-grey-lighten-5">
+        <div class="mb-4 bg-blue-lighten-5 pa-3 rounded-lg border-dashed">
+          <p class="text-caption text-blue-darken-3 mb-0">
+            Sistem akan mencocokkan <b>Nama</b> dan <b>Departemen</b> secara otomatis.
+          </p>
+        </div>
+
+        <v-label class="mb-2 text-caption font-weight-bold text-grey-darken-2">Periode Absensi</v-label>
+        <v-select
+          v-model="selectedPeriod"
+          :items="availablePeriods"
+          variant="outlined"
+          density="compact"
+          bg-color="white"
+          color="primary"
+          hide-details
+          class="mb-4 small-input"
+        ></v-select>
+
+        <v-label class="mb-2 text-caption font-weight-bold text-grey-darken-2">Pilih File Excel (.xlsx)</v-label>
+        <v-file-input 
+          v-model="file" 
+          variant="outlined" 
+          density="compact" 
+          accept=".xlsx" 
+          prepend-icon="" 
+          color="primary"
+          bg-color="white"
+          prepend-inner-icon="mdi-file-excel" 
+          placeholder="Upload file fingerprint"
+          hide-details 
+          class="mb-4 small-input"
+        ></v-file-input>
+
+        <v-btn 
+          :loading="loading" 
+          color="primary" 
+          block 
+          elevation="2"
+          class="text-none font-weight-bold mb-3"
+          @click="uploadFile" 
+          :disabled="!file"
+        >
+          <CloudUploadIcon size="18" class="mr-2"/> Proses Import Data
+        </v-btn>
+
+        <v-divider class="my-4"></v-divider>
+
+        <v-btn 
+          variant="text" 
+          color="secondary" 
+          block 
+          class="text-none text-caption font-weight-medium" 
+          :href="TEMPLATE_URL" 
+          target="_blank"
+        >
+          <DownloadIcon size="16" class="mr-1"/> Download Format Template
+        </v-btn>
+      </v-card-text>
+    </v-card>
+  </v-dialog>
 
   <v-dialog v-model="errDialog" max-width="500" transition="dialog-bottom-transition">
     <v-card class="rounded-lg overflow-hidden small-dialog-card">
@@ -299,20 +340,49 @@ onMounted(load);
 </template>
 
 <style scoped>
-/* Tambahkan style untuk gap agar tombol aksi tidak menempel */
-.gap-1 {
-  gap: 4px;
-}
-/* Style lainnya tetap sama seperti kode Anda sebelumnya */
+.gap-1 { gap: 4px; }
 .bg-gradient-smooth { background: linear-gradient(135deg, #1565C0 0%, #42A5F5 60%, #BBDEFB 100%); }
 .bg-gradient-danger { background: linear-gradient(135deg, #D32F2F 0%, #EF5350 60%, #FFCDD2 100%); }
 .border-dashed { border: 1px dashed #90CAF9 !important; }
 .compact-data-table :deep(th) { height: 40px !important; font-size: 0.75rem !important; }
-.compact-data-table :deep(td) { height: 44px !important; font-size: 0.75rem !important; }
+.compact-data-table :deep(td) { height: 52px !important; font-size: 0.75rem !important; }
 .log-row:hover { background-color: #f1f5f9 !important; }
 .inner-table :deep(th) { background-color: #f8fafc; height: 32px !important; }
 .small-input :deep(.v-field) { border-radius: 8px; }
 .text-xsmall { font-size: 0.65rem !important; }
 .max-h-300 { max-height: 300px; }
 .gap-2 { gap: 8px; }
+
+/* Styling Row Posted (Hanya teks dan background yang samar) */
+.row-posted td:not(.position-relative) {
+  background-color: #f5f5f5 !important;
+  color: #9e9e9e !important;
+  opacity: 0.7;
+}
+
+/* Kolom periode khusus (karena ada stempel) */
+.row-posted td.position-relative {
+  background-color: #f5f5f5 !important;
+  color: #757575 !important;
+}
+
+/* Watermark Stamp (Tetap Jelas) */
+.posted-stamp {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-12deg);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.posted-stamp img {
+  height: 42px;
+  opacity: 1 !important; /* Memastikan stempel tetap cerah */
+  filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.1));
+}
+
+.position-relative {
+  position: relative;
+}
 </style>

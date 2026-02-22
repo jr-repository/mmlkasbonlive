@@ -84,9 +84,7 @@ onMounted(loadData);
 
 <template>
   <v-row>
-    <v-col cols="12">
-      <BaseBreadcrumb title="Komponen Gaji" :breadcrumbs="[{title: 'Payroll', disabled: false}, {title: 'Komponen', disabled: true}]"></BaseBreadcrumb>
-      
+    <v-col cols="12">      
       <v-card elevation="4" rounded="lg" class="mb-4 overflow-hidden compact-header-card">
         <div class="bg-gradient-smooth px-4 py-3">
           <div class="d-flex align-center gap-2">
