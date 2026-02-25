@@ -3,7 +3,8 @@ import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { format } from 'date-fns';
 import { useAuthStore } from '@/stores/auth';
 import UiParentCard from '@/components/shared/UiParentCard.vue';
-import AsyncSelect from '@/components/common/AsyncSelect.vue';
+// HAPUS AsyncSelect KARENA KITA GANTI DENGAN V-AUTOCOMPLETE
+// import AsyncSelect from '@/components/common/AsyncSelect.vue';
 import { 
  PlusIcon, TrashIcon, EyeIcon, DeviceFloppyIcon, XIcon, WalletIcon,
  CheckIcon, BanIcon, PencilIcon, SearchIcon, FileInvoiceIcon, ListCheckIcon, FormsIcon, ClockIcon 
@@ -12,17 +13,22 @@ import {
 const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 const authStore = useAuthStore();
 
-let searchTimeout: ReturnType<typeof setTimeout> | null = null;
-
 // --- STATE NAVIGASI TAB BARU ---
 const tab = ref(1); 
 const filterStatus = ref('ALL'); 
 
-// --- STATE ---
+// --- STATE LIST DATA ---
 const loadingList = ref(false);
-const invoiceList = ref<any[]>([]);
-const search = ref('');
+const invoiceList = ref<any[]>([]); // Menyimpan seluruh data invoice
+const search = ref(''); // Input pencarian untuk list invoice
 const taxList = ref<any[]>([]); 
+
+// --- STATE UNTUK DROPDOWN (SEARCH LOKAL FORM) ---
+const customerList = ref<any[]>([]);
+const loadingCustomers = ref(false);
+
+const itemList = ref<any[]>([]);
+const loadingItems = ref(false);
 
 // --- FORM STATE ---
 const form = reactive({
@@ -131,17 +137,61 @@ const totalPPh = computed(() => {
 const grandTotal = computed(() => taxableAmount.value + totalPPN.value - totalPPh.value); 
 const netBalance = computed(() => grandTotal.value - form.downPayment);
 
+// --- LOGIKA FILTERING LIST INVOICE (CLIENT SIDE) ---
 const filteredInvoiceList = computed(() => {
   let list = invoiceList.value;
+
+  // 1. Filter Status
   if(filterStatus.value !== 'ALL') {
     list = list.filter(item => item.status === filterStatus.value || (filterStatus.value === 'SUBMITTED' && item.status === 'WAITING_PAYMENT'));
   }
+
+  // 2. Filter Search (Client Side)
+  if (search.value) {
+    const query = search.value.toLowerCase();
+    list = list.filter(item => 
+      (item.number && item.number.toLowerCase().includes(query)) ||
+      (item.customerName && item.customerName.toLowerCase().includes(query)) ||
+      (item.status && item.status.toLowerCase().includes(query))
+    );
+  }
+
   return list;
 });
 
 const isOverdue = (days: number) => days > 0;
 
-// --- METHODS ---
+// --- METHODS AMBIL DATA MASTER (SEKALI SAJA) ---
+const fetchCustomers = async () => {
+  loadingCustomers.value = true;
+  try {
+    const res = await fetch(`${API_BASE_URL}/Invoice/MasterCustomer.php`);
+    const json = await res.json();
+    if (json.s && Array.isArray(json.d)) {
+      customerList.value = json.d;
+    }
+  } catch (e) {
+    // Silent fail or log
+  } finally {
+    loadingCustomers.value = false;
+  }
+};
+
+const fetchItems = async () => {
+  loadingItems.value = true;
+  try {
+    const res = await fetch(`${API_BASE_URL}/Invoice/MasterItem.php`);
+    const json = await res.json();
+    if (json.s && Array.isArray(json.d)) {
+      itemList.value = json.d;
+    }
+  } catch (e) {
+    // Silent fail or log
+  } finally {
+    loadingItems.value = false;
+  }
+};
+
 const fetchTaxes = async () => {
  try {
   const res = await fetch(`${API_BASE_URL}/MasterData/Tax/List.php`);
@@ -155,16 +205,12 @@ const getDefaultTax = (type: string) => {
  return t ? t.rate : 0;
 };
 
-const fetchListDebounced = () => {
- if (searchTimeout) clearTimeout(searchTimeout);
- searchTimeout = setTimeout(fetchList, 400); 
-};
-
+// --- METHODS AMBIL LIST INVOICE ---
 const fetchList = async () => {
  loadingList.value = true;
  try {
   const url = new URL(`${API_BASE_URL}/Invoice/List.php`);
-  if(search.value) url.searchParams.append('q', search.value);
+  // Kita hapus append 'q' agar data diambil semua, lalu difilter di computed
   const res = await fetch(url.toString());
   const json = await res.json();
   if(json.s) invoiceList.value = json.d.map((x:any, i:number) => ({
@@ -188,19 +234,23 @@ const removeItem = (idx: number) => {
  if(form.items.length > 1) form.items.splice(idx, 1);
 };
 
-const onCustChange = (obj: any) => {
- if(obj) {
-  form.customerNo = obj.customerNo;
-  form.customerName = obj.name;
- }
+// Handler saat Customer dipilih dari v-autocomplete
+const onCustChange = (val: any) => {
+  const selected = customerList.value.find(c => c.customerNo === val);
+  if (selected) {
+    form.customerNo = selected.customerNo;
+    form.customerName = selected.name;
+  }
 };
 
-const onItemChange = (obj: any) => {
- if(obj) {
-  itemDetailForm.itemNo = obj.no;
-  itemDetailForm.itemName = obj.name;
-  itemDetailForm.unitPrice = obj.unitPrice || 0;
- }
+// Handler saat Item dipilih dari v-autocomplete (di modal detail item)
+const onItemChange = (val: any) => {
+  const selected = itemList.value.find(i => i.no === val);
+  if (selected) {
+    itemDetailForm.itemNo = selected.no;
+    itemDetailForm.itemName = selected.name;
+    itemDetailForm.unitPrice = selected.unitPrice || 0;
+  }
 };
 
 const resetForm = () => {
@@ -411,17 +461,18 @@ const saveItemDetail = () => {
  editingItemIndex.value = -1;
 };
 
-// --- HOOKS & WATCHERS ---
-watch(search, fetchListDebounced); 
-watch(filterStatus, fetchListDebounced); 
-
+// --- HOOKS ---
 onMounted(() => {
+ // Load Data Master Sekali Saja
+ fetchCustomers();
+ fetchItems();
  fetchTaxes().then(() => {
   if(form.items.length > 0) {
    form.items[0].ppnRate = getDefaultTax('PPN');
    form.items[0].pphRate = getDefaultTax('PPH');
   }
  });
+ // Load List Transaksi
  fetchList(); 
 });
 </script>
@@ -627,17 +678,21 @@ onMounted(() => {
           class="mb-2 small-input"
          ></v-text-field>
 
-         <AsyncSelect 
-          label="Select Customer" 
-          :apiEndpoint="`${API_BASE_URL}/Invoice/MasterCustomer.php`" 
-          item-title="name" 
-          item-value="customerNo"
-          v-model="form.customerNo"
-          @change="onCustChange"
-          density="compact"
-          hide-details
-          class="mb-2 small-input"
+         <v-autocomplete 
+           label="Select Customer" 
+           :items="customerList"
+           item-title="name" 
+           item-value="customerNo"
+           v-model="form.customerNo"
+           @update:model-value="onCustChange"
+           :loading="loadingCustomers"
+           density="compact"
+           hide-details
+           variant="outlined"
+           class="mb-2 small-input"
+           placeholder="Search customer..."
          />
+
          <v-textarea 
           label="Keterangan / Notes" 
           v-model="form.description" 
@@ -825,18 +880,19 @@ onMounted(() => {
     
         <v-row no-gutters class="mb-3">
      <div class="text-caption font-weight-bold mb-1 d-block text-primary">Item / Service</div>
-     <AsyncSelect 
+     <v-autocomplete 
       label="Select Item" 
-      :apiEndpoint="`${API_BASE_URL}/Invoice/MasterItem.php`"
+      :items="itemList"
       item-title="name" 
       item-value="no"
-      :model-value="itemDetailForm.itemNo"
-      @change="(o:any) => { onItemChange(o); itemDetailForm.asyncSelectValue = o?.no }"
+      v-model="itemDetailForm.itemNo"
+      @update:model-value="(val) => { onItemChange(val); itemDetailForm.asyncSelectValue = val }"
+      :loading="loadingItems"
       density="compact"
       hide-details
       variant="outlined"
       class="small-input"
-      :key="itemDetailForm.asyncSelectValue"
+      placeholder="Search item..."
      />
     </v-row>
 

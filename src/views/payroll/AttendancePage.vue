@@ -211,9 +211,9 @@ onMounted(load);
                         <tr v-for="d in details[log.id]" :key="d.id">
                           <td class="text-caption font-weight-bold">{{ d.name }}</td>
                           <td><v-chip size="x-small" variant="flat" color="grey-lighten-3" class="text-caption">{{ d.dept }}</v-chip></td>
-                          <td class="text-center text-caption">{{ d.late_min }}m</td>
-                          <td class="text-center text-caption text-error font-weight-bold">{{ d.absence_days }}h</td>
-                          <td class="text-center text-caption text-success font-weight-bold">{{ d.overtime_hours }}j</td>
+                          <td class="text-center text-caption">{{ d.late_min }} Menit</td>
+                          <td class="text-center text-caption text-error font-weight-bold">{{ d.absence_days }} Hari</td>
+                          <td class="text-center text-caption text-success font-weight-bold">{{ parseFloat(d.overtime_hours) }} Hari</td>
                         </tr>
                       </tbody>
                     </v-table>

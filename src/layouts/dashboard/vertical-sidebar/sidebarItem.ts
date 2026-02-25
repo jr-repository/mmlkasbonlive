@@ -9,8 +9,10 @@ import {
     UsersIcon,
     SettingsIcon,
     ShieldCheckIcon,
-    ActivityIcon, // Icon Baru
-    UserCircleIcon // Icon untuk Profile Setting
+    ActivityIcon,
+    UserCircleIcon,
+    CashIcon,   // Icon untuk Modul Payroll
+    CircleIcon  // Icon untuk Submenu
 } from 'vue-tabler-icons';
 
 export interface menu {
@@ -78,13 +80,11 @@ const sidebarItem: menu[] = [
         icon: ChartBarIcon,
         to: '/laporan'
     },
-    // --- MENU BARU ---
     {
         title: 'Aktivitas User',
         icon: ActivityIcon,
         to: '/report/user-activity'
     },
-    // ----------------
     {
         title: 'Rekonsiliasi Bank',
         icon: ArrowsLeftRightIcon,
@@ -110,13 +110,11 @@ const sidebarItem: menu[] = [
 
     // --- Kategori: Administrasi & Konfigurasi Sistem ---
     { header: 'Administrasi & Pengaturan' },
-    // --- PENAMBAHAN MENU BARU: PROFILE SETTING ---
     {
         title: 'Profile Setting',
         icon: UserCircleIcon,
         to: '/profile-settings'
     },
-    // ----------------------------------------------
     {
         title: 'Manajemen User',
         icon: UsersIcon,
@@ -133,38 +131,40 @@ const sidebarItem: menu[] = [
         to: '/settings'
     },
 
+    // --- MODULE PAYROLL SYSTEM ---
+    // Logika tampilan akan bergantung pada key 'payroll_system' di database
     {
-    title: 'Payroll System',
-    icon: 'LayoutDashboardIcon', // Sesuaikan icon yang tersedia (misal: CashIcon atau CalculatorIcon)
-    to: '#',
-    children: [
-        {
-            title: 'Master Data Karyawan',
-            icon: 'CircleIcon',
-            to: '/payroll/master-karyawan'
-        },
-        {
-            title: 'Komponen Gaji',
-            icon: 'CircleIcon',
-            to: '/payroll/komponen-gaji'
-        },
-        {
-            title: 'Absensi Fingerprint',
-            icon: 'CircleIcon',
-            to: '/payroll/absensi'
-        },
-        {
-            title: 'Setting & Proses Payroll',
-            icon: 'CircleIcon',
-            to: '/payroll/proses'
-        },
-        {
-            title: 'Laporan & Slip Gaji',
-            icon: 'CircleIcon',
-            to: '/payroll/laporan'
-        }
-    ]
-},
+        title: 'Payroll System',
+        icon: CashIcon, 
+        to: '/payroll', // Parent Path
+        children: [
+            {
+                title: 'Master Data Karyawan',
+                icon: CircleIcon,
+                to: '/payroll/master-karyawan'
+            },
+            {
+                title: 'Komponen Gaji',
+                icon: CircleIcon,
+                to: '/payroll/komponen-gaji'
+            },
+            {
+                title: 'Absensi Fingerprint',
+                icon: CircleIcon,
+                to: '/payroll/absensi'
+            },
+            {
+                title: 'Setting & Proses Payroll',
+                icon: CircleIcon,
+                to: '/payroll/proses'
+            },
+            {
+                title: 'Laporan & Slip Gaji',
+                icon: CircleIcon,
+                to: '/payroll/laporan'
+            }
+        ]
+    },
 ];
 
 export default sidebarItem;

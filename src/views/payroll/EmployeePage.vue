@@ -281,7 +281,7 @@ onMounted(loadData);
             <v-label class="mb-1 text-caption font-weight-bold text-grey-darken-2 d-block">Departemen</v-label>
             <v-select 
               v-model="form.dept" 
-              :items="['IT', 'HRD', 'Finance', 'GA']" 
+              :items="['IT', 'HRD', 'Finance', 'GA', 'Exim', 'Marketing', 'Direktur', 'Direktur Utama', 'Komisaris']" 
               variant="outlined" 
               density="compact" 
               color="primary" 

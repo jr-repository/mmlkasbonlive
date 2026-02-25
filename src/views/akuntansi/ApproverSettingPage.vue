@@ -75,15 +75,6 @@ onMounted(fetchUsers);
         </v-card>
   <v-row class="justify-center mt-2">
     <v-col cols="12" md="12">
-      <v-alert color="info" variant="tonal" class="mb-4 pa-2" border="start">
-        <template v-slot:prepend>
-          <AlertCircleIcon size="18" class="mr-1" />
-        </template>
-        <div class="text-subtitle-2 font-weight-bold">Setting Approver</div>
-        <div class="text-caption">
-          Atur hak akses user untuk melakukan Approval pada modul-modul berikut.
-        </div>
-      </v-alert>
 
       <UiParentCard title="Matrix Otoritas Approval" class="compact-card">
         <v-table class="border rounded-md compact-table" density="compact">

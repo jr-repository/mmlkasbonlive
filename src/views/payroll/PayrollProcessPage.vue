@@ -3,10 +3,22 @@
     <v-col cols="12">      
       <v-card elevation="4" rounded="lg" class="mb-4 overflow-hidden compact-header-card">
         <div class="bg-gradient-smooth px-4 py-3">
-          <div class="d-flex align-center gap-2">
-            <div>
-              <h2 class="text-h6 font-weight-bold text-white mb-0">Payroll Processing Center</h2>
-              <div class="text-caption text-white opacity-90">Kalkulasi gaji berdasarkan komponen master dan data absensi.</div>
+          <div class="d-flex align-center justify-space-between">
+            <div class="d-flex align-center gap-2">
+              <div>
+                <h2 class="text-h6 font-weight-bold text-white mb-0">Payroll Processing Center</h2>
+                <div class="text-caption text-white opacity-90">Kalkulasi gaji berdasarkan komponen master dan data absensi.</div>
+              </div>
+            </div>
+            
+            <div v-if="tab === 'salary_master'" class="d-flex gap-2">
+              <v-btn color="white" variant="flat" size="small" class="text-none font-weight-bold text-primary" prepend-icon="mdi-download" @click="downloadTemplate">
+                Download Template
+              </v-btn>
+              <v-btn color="white" variant="outlined" size="small" class="text-none font-weight-bold" prepend-icon="mdi-upload" @click="$refs.fileInput.click()">
+                Import Excel
+              </v-btn>
+              <input type="file" ref="fileInput" class="d-none" accept=".xlsx, .xls" @change="handleImport">
             </div>
           </div>
         </div>
@@ -120,7 +132,7 @@
                   <tr class="bg-grey-lighten-4">
                     <th v-for="c in masterComps.incomes" :key="'h-'+c.id" class="text-xsmall">{{ c.name }}</th>
                     <th v-for="c in masterComps.deductions" :key="'h-'+c.id" class="text-xsmall">{{ c.name }}</th>
-                    <th class="text-xsmall bg-blue-lighten-5">Tarif Lembur/Jam</th>
+                    <th class="text-xsmall bg-blue-lighten-5">Tarif Lembur/Hari</th>
                     <th class="text-xsmall bg-blue-lighten-5">Pot. Absen/Hari</th>
                     <th class="text-xsmall bg-blue-lighten-5">Pot. Telat/Menit</th>
                     <th class="text-xsmall bg-blue-lighten-5">BPJS Fixed</th>
@@ -217,7 +229,7 @@
                 <h4 class="text-caption font-weight-bold text-info mb-3"><v-icon size="small" class="mr-1">mdi-account-cog</v-icon> Parameter Individu</h4>
                 
                 <div class="mb-3">
-                  <v-label class="text-xsmall font-weight-bold mb-1 d-block text-success">Tarif Lembur (Per Jam)</v-label>
+                  <v-label class="text-xsmall font-weight-bold mb-1 d-block text-success">Tarif Lembur (Per Hari)</v-label>
                   <v-text-field v-model="editForm.overtime_rate" type="number" variant="outlined" density="compact" prefix="Rp" hide-details class="bg-white small-input"></v-text-field>
                 </div>
                 
@@ -279,7 +291,7 @@
                   <span class="text-grey-darken-1">Mangkir:</span> <b>{{ simData.dummy.absence_days }} hari</b>
                 </v-col>
                 <v-col cols="6" class="d-flex justify-space-between pl-2 mt-1">
-                  <span class="text-grey-darken-1">Lembur:</span> <b>{{ simData.dummy.overtime_hours }} jam</b>
+                  <span class="text-grey-darken-1">Lembur:</span> <b>{{ simData.dummy.overtime_hours }} Hari</b>
                 </v-col>
               </v-row>
             </div>
@@ -358,6 +370,8 @@ const masterComps = reactive({ incomes: [], deductions: [] });
 const loading = ref(false);
 const finalizing = ref(false);
 
+const fileInput = ref(null);
+
 // State untuk Modal Breakdown
 const breakdownDialog = ref(false);
 const selectedBreakdown = ref(null);
@@ -401,9 +415,41 @@ const loadSalaryMaster = async () => {
   }
 };
 
+// --- FUNGSI EXCEL ---
+const downloadTemplate = () => {
+  window.open(`${API_BASE}/ExportTemplate.php`, '_blank');
+};
+
+const handleImport = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('excel_file', file);
+
+  try {
+    loading.value = true;
+    const r = await fetch(`${API_BASE}/ImportSalary.php`, {
+      method: 'POST',
+      body: formData
+    }).then(res => res.json());
+
+    if (r.s) {
+      alert(r.message);
+      await loadSalaryMaster(); // Refresh data tabel
+    } else {
+      alert("Gagal Import: " + r.message);
+    }
+  } catch (e) {
+    alert("Kesalahan koneksi saat import.");
+  } finally {
+    loading.value = false;
+    event.target.value = ''; // Reset input file
+  }
+};
+
 // --- FUNGSI MODAL EDIT ---
 const openEditDialog = (emp) => {
-  // Deep clone agar tidak mengubah tampilan tabel sebelum disave
   editForm.value = JSON.parse(JSON.stringify(emp));
   editDialog.value = true;
 };
@@ -427,7 +473,6 @@ const saveEdit = async () => {
     
     if (r.s) {
       alert(r.message);
-      // Update data di local array agar tabel refresh otomatis
       const idx = employeeList.value.findIndex(x => x.nik === payload.nik);
       if (idx > -1) {
         employeeList.value[idx] = editForm.value;
@@ -445,69 +490,38 @@ const saveEdit = async () => {
 
 // --- FUNGSI MODAL SIMULASI ---
 const openSimulateDialog = (emp) => {
-  // Dummy absensi untuk keperluan simulasi
-  const dummy = {
-    late_min: 45,
-    early_min: 0,
-    absence_days: 1,
-    overtime_hours: 4
-  };
+  const dummy = { late_min: 45, early_min: 0, absence_days: 1, overtime_hours: 4 };
+  let totalInc = 0; let totalDed = 0;
+  const incBreakdown = []; const dedBreakdown = [];
 
-  let totalInc = 0;
-  let totalDed = 0;
-  const incBreakdown = [];
-  const dedBreakdown = [];
-
-  // Hitung Incomes
   masterComps.incomes.forEach(c => {
     const amt = Number(emp.salary_values[c.id]) || 0;
     totalInc += amt;
     if (amt > 0) incBreakdown.push({ name: c.name, amount: amt });
   });
 
-  // Hitung Deductions
   masterComps.deductions.forEach(c => {
     const amt = Number(emp.salary_values[c.id]) || 0;
     totalDed += amt;
     if (amt > 0) dedBreakdown.push({ name: c.name, amount: amt });
   });
 
-  // Hitung Parameter Individu vs Dummy Data
   const otPay = dummy.overtime_hours * Number(emp.overtime_rate || 0);
   const latePen = dummy.late_min * Number(emp.late_rate || 0);
   const absPen = dummy.absence_days * Number(emp.absent_rate || 0);
   const bpjs = Number(emp.bpjs_amount || 0);
-
   const net = (totalInc + otPay) - (totalDed + latePen + absPen + bpjs);
 
   simData.value = {
-    name: emp.name,
-    dummy: dummy,
-    rates: { 
-      overtime: Number(emp.overtime_rate || 0), 
-      late: Number(emp.late_rate || 0), 
-      absent: Number(emp.absent_rate || 0) 
-    },
-    incBreakdown,
-    dedBreakdown,
-    totalInc,
-    totalDed,
-    otPay,
-    latePen,
-    absPen,
-    bpjs,
-    net
+    name: emp.name, dummy, rates: { overtime: Number(emp.overtime_rate || 0), late: Number(emp.late_rate || 0), absent: Number(emp.absent_rate || 0) },
+    incBreakdown, dedBreakdown, totalInc, totalDed, otPay, latePen, absPen, bpjs, net
   };
-
   simulateDialog.value = true;
 };
 
 // --- FUNGSI GENERATE & FINALIZE ---
 const generate = async () => {
-  if (!period.value) {
-    alert("Silahkan pilih periode pembayaran terlebih dahulu!");
-    return;
-  }
+  if (!period.value) { alert("Silahkan pilih periode pembayaran terlebih dahulu!"); return; }
   loading.value = true;
   const r = await fetch(`${API_BASE}/Generate.php`, { method: 'POST', body: JSON.stringify({ period: period.value }) }).then(res => res.json());
   if (r.s) payrollData.value = r.d;
@@ -516,36 +530,13 @@ const generate = async () => {
 
 const finalize = async () => {
   if (payrollData.value.length === 0) return;
-  if (!confirm("Apakah anda yakin ingin memfinalisasi data payroll periode " + period.value + "? Data akan disimpan permanen ke laporan.")) return;
-
+  if (!confirm("Apakah anda yakin ingin memfinalisasi data payroll periode " + period.value + "?")) return;
   finalizing.value = true;
   try {
-    const payload = {
-      period: period.value,
-      total_gross: totalGross.value,
-      total_deduction: totalDeduction.value,
-      total_net: totalNet.value,
-      details: payrollData.value 
-    };
-
-    const res = await fetch(`${API_BASE}/Finalize.php`, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    }).then(r => r.json());
-
-    if (res.s) {
-      alert("Berhasil! Payroll telah disimpan ke database laporan.");
-      payrollData.value = []; 
-      period.value = ''; 
-      await loadPeriods(); 
-    } else {
-      alert("Gagal: " + res.message);
-    }
-  } catch (e) {
-    alert("Kesalahan koneksi ke server.");
-  } finally {
-    finalizing.value = false;
-  }
+    const payload = { period: period.value, total_gross: totalGross.value, total_deduction: totalDeduction.value, total_net: totalNet.value, details: payrollData.value };
+    const res = await fetch(`${API_BASE}/Finalize.php`, { method: 'POST', body: JSON.stringify(payload) }).then(r => r.json());
+    if (res.s) { alert("Berhasil!"); payrollData.value = []; period.value = ''; await loadPeriods(); } else { alert("Gagal: " + res.message); }
+  } catch (e) { alert("Kesalahan koneksi."); } finally { finalizing.value = false; }
 };
 
 const openBreakdown = (p) => { selectedBreakdown.value = p; breakdownDialog.value = true; };
@@ -558,25 +549,13 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* CSS Tambahan untuk Scroll Horizontal pada Tabel */
-.table-responsive { 
-  overflow-x: auto; 
-  width: 100%; 
-  -webkit-overflow-scrolling: touch; 
-}
-
+.table-responsive { overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; }
 .dynamic-payroll-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
 .dynamic-payroll-table th, .dynamic-payroll-table td { border: 1px solid #ddd; padding: 8px; white-space: nowrap; }
 .hover-row:hover td { background-color: #f8fafc !important; }
-
-/* Sticky Left & Right Column Fix untuk Horizontal Scroll */
 .sticky-left { position: sticky; left: 0; z-index: 10; border-right: 2px solid #ddd !important; }
 .sticky-right { position: sticky; right: 0; z-index: 10; border-left: 2px solid #ddd !important; background-color: #f5f5f5; }
-.dynamic-payroll-table tbody td.sticky-left,
-.dynamic-payroll-table tbody td.sticky-right { background-color: white !important; }
-.hover-row:hover td.sticky-left,
-.hover-row:hover td.sticky-right { background-color: #f8fafc !important; }
-
+.dynamic-payroll-table tbody td.sticky-left, .dynamic-payroll-table tbody td.sticky-right { background-color: white !important; }
 .bg-gradient-smooth { background: linear-gradient(135deg, #1565C0 0%, #42A5F5 100%); }
 .bg-gradient-danger { background: linear-gradient(135deg, #D32F2F 0%, #EF5350 100%); }
 .bg-gradient-success { background: linear-gradient(135deg, #2E7D32 0%, #66BB6A 100%); }
@@ -586,6 +565,7 @@ onMounted(() => {
 .small-input :deep(.v-field) { --v-field-padding-bottom: 4px; --v-field-padding-top: 4px; min-height: 36px !important; }
 .text-error-input :deep(input) { color: #D32F2F !important; font-weight: bold; }
 .gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
 .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important; }
 .opacity-70 { opacity: 0.7; }
 </style>

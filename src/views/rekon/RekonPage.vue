@@ -15,7 +15,8 @@ import {
   CheckIcon,
   XIcon,
   PlusIcon,
-  CalendarIcon 
+  CalendarIcon,
+  PencilIcon 
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
@@ -34,14 +35,12 @@ const filterDate = reactive({ from: '', to: '' });
 
 let timeout: ReturnType<typeof setTimeout> | null = null; 
 
-const modalOpen = ref(false);
-const selectedItem = ref<any>(null);
-const actionForm = reactive({ status: '', note: '' });
-const uploadFiles = ref<File[]>([]);
-const submitting = ref(false);
-
+// --- Edit & Create Logic State ---
 const createModalOpen = ref(false);
-const creating = ref(false);
+const creating = ref(false); // Dipakai untuk loading state save/update
+const isEditing = ref(false);
+const editingId = ref<number | null>(null);
+
 const createForm = reactive({
   account_no: '',
   date: new Date().toISOString().substr(0, 10),
@@ -53,6 +52,13 @@ const createForm = reactive({
   debit: 0,
   credit: 0
 });
+
+// --- Action Approval State ---
+const modalOpen = ref(false);
+const selectedItem = ref<any>(null);
+const actionForm = reactive({ status: '', note: '' });
+const uploadFiles = ref<File[]>([]);
+const submitting = ref(false);
 
 const snackbar = reactive({ show: false, text: '', color: 'success' });
 const showMsg = (text: string, color = 'success') => { snackbar.text = text; snackbar.color = color; snackbar.show = true; };
@@ -119,7 +125,7 @@ const handleFileChange = async (e: Event) => {
   const file = target.files[0];
   const formData = new FormData();
   formData.append("file", file);
-  
+   
   if(currentUser && currentUser.id) {
     formData.append('user_id', currentUser.id);
   }
@@ -154,7 +160,13 @@ const exportData = () => {
     window.location.href = `${API_BASE_URL}/Rekon/ExportExcel.php?${params.toString()}`;
 };
 
+// --- LOGIC CREATE & EDIT ---
+
 const openCreateModal = () => {
+  isEditing.value = false;
+  editingId.value = null;
+  
+  // Reset Form
   createForm.account_no = '';
   createForm.date = new Date().toISOString().substr(0, 10);
   createForm.val_date = new Date().toISOString().substr(0, 10);
@@ -164,23 +176,52 @@ const openCreateModal = () => {
   createForm.reference_no = '';
   createForm.debit = 0;
   createForm.credit = 0;
+  
   createModalOpen.value = true;
 };
 
-const handleCreateSubmit = async () => {
+const openEditModal = (item: any) => {
+  isEditing.value = true;
+  editingId.value = item.id;
+
+  // Fill Form with Item Data
+  createForm.account_no = item.account_no;
+  createForm.date = item.date;
+  createForm.val_date = item.val_date || item.date;
+  createForm.transaction_code = item.transaction_code;
+  createForm.description1 = item.description1;
+  createForm.description2 = item.description2;
+  createForm.reference_no = item.reference_no;
+  createForm.debit = item.debit;
+  createForm.credit = item.credit;
+
+  createModalOpen.value = true;
+};
+
+const handleFormSubmit = async () => {
   if(!createForm.account_no || !createForm.transaction_code) {
     showMsg("Account No dan Trx Code wajib diisi", "error");
     return;
   }
-  
+   
   creating.value = true;
   try {
-    const payload = {
+    // Tentukan URL berdasarkan mode (Create vs Update)
+    const url = isEditing.value 
+        ? `${API_BASE_URL}/Rekon/Update.php`
+        : `${API_BASE_URL}/Rekon/Create.php`;
+
+    const payload: any = {
       ...createForm,
       created_by: currentUser?.id
     };
+
+    // Jika edit, tambahkan ID
+    if(isEditing.value && editingId.value) {
+        payload.id = editingId.value;
+    }
     
-    const res = await fetch(`${API_BASE_URL}/Rekon/Create.php`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -188,18 +229,20 @@ const handleCreateSubmit = async () => {
     const json = await res.json();
 
     if(json.s) {
-      showMsg("Transaksi berhasil ditambahkan", "success");
+      showMsg(json.message || "Data berhasil disimpan", "success");
       createModalOpen.value = false;
       fetchData();
     } else {
       showMsg(json.message || "Gagal menyimpan", "error");
     }
   } catch(e) {
-    showMsg("Terjadi kesalahan koneksi saat menyimpan manual.", "error");
+    showMsg("Terjadi kesalahan koneksi saat menyimpan.", "error");
   } finally {
     creating.value = false;
   }
 };
+
+// --- LOGIC APPROVAL ACTION ---
 
 const openModal = (item: any, initialStatus: string | null = null) => {
   selectedItem.value = item;
@@ -257,7 +300,7 @@ onBeforeUnmount(() => {
         <div class="text-caption text-grey">Kelola dan cocokkan transaksi bank internal</div>
       </div>
       <div class="d-flex gap-2 align-center">
-     
+      
         <v-btn variant="outlined" color="success" @click="exportData" size="small" class="text-caption">
           <DownloadIcon size="16" class="mr-1" /> Export Data
         </v-btn>
@@ -328,7 +371,7 @@ onBeforeUnmount(() => {
               </template>
             </v-text-field>
           </div>
-          
+           
           <div style="width: 150px;">
             <v-text-field
                 v-model="filterDate.from"
@@ -359,7 +402,7 @@ onBeforeUnmount(() => {
               </template>
             </v-text-field>
           </div>
-          
+           
           <div style="width: 150px;">
             <v-select
               v-model="filterStatus"
@@ -423,17 +466,24 @@ onBeforeUnmount(() => {
               </template>
               
               <template v-slot:item.actions="{ item }">
-                <div v-if="item.status === 'New'" class="d-inline-flex">
-                  <v-btn icon variant="text" size="x-small" color="success" @click="openModal(item, 'Approved')" title="Approve">
-                    <CheckIcon size="16" />
-                  </v-btn>
-                  <v-btn icon variant="text" size="x-small" color="error" @click="openModal(item, 'Rejected')" title="Reject">
-                    <XIcon size="16" />
-                  </v-btn>
+                <div class="d-inline-flex align-center">
+                    <div v-if="item.status === 'New'" class="d-inline-flex">
+                        <v-btn icon variant="text" size="x-small" color="success" @click="openModal(item, 'Approved')" title="Approve">
+                            <CheckIcon size="16" />
+                        </v-btn>
+                        <v-btn icon variant="text" size="x-small" color="error" @click="openModal(item, 'Rejected')" title="Reject">
+                            <XIcon size="16" />
+                        </v-btn>
+                    </div>
+
+                    <v-btn v-if="item.status !== 'Approved'" icon variant="text" size="x-small" color="warning" @click="openEditModal(item)" title="Edit">
+                        <PencilIcon size="16" />
+                    </v-btn>
+
+                    <v-btn icon variant="text" size="x-small" color="primary" @click="openModal(item)">
+                        <EyeIcon size="16" />
+                    </v-btn>
                 </div>
-                <v-btn v-else icon variant="text" size="x-small" color="primary" @click="openModal(item)">
-                  <EyeIcon size="16" />
-                </v-btn>
               </template>
 
             </v-data-table>
@@ -445,7 +495,7 @@ onBeforeUnmount(() => {
     <v-dialog v-model="createModalOpen" max-width="600" persistent>
     <v-card class="rounded-lg small-dialog-card">
       <v-card-title class="bg-primary text-white d-flex justify-space-between align-center px-4 py-3 text-subtitle-1">
-        Input Transaksi Baru
+        {{ isEditing ? 'Edit Transaksi' : 'Input Transaksi Baru' }}
         <v-btn icon variant="text" color="white" size="small" @click="createModalOpen = false"><XIcon size="18"/></v-btn>
       </v-card-title>
       <v-card-text class="pt-4 pb-0">
@@ -483,14 +533,14 @@ onBeforeUnmount(() => {
       <v-card-actions class="px-4 py-3">
         <v-spacer></v-spacer>
         <v-btn variant="text" color="grey" size="small" @click="createModalOpen = false" class="text-caption">Batal</v-btn>
-        <v-btn color="primary" variant="flat" size="small" @click="handleCreateSubmit" :loading="creating" class="text-caption">
-          <CheckIcon size="16" class="mr-1"/> Simpan
+        <v-btn color="primary" variant="flat" size="small" @click="handleFormSubmit" :loading="creating" class="text-caption">
+          <CheckIcon size="16" class="mr-1"/> {{ isEditing ? 'Update Data' : 'Simpan' }}
         </v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
 
-    <v-dialog v-model="modalOpen" max-width="500" scrollable>
+  <v-dialog v-model="modalOpen" max-width="500" scrollable>
     <v-card v-if="selectedItem" class="rounded-lg small-dialog-card">
       <v-card-title class="d-flex justify-space-between align-center px-4 py-3 bg-grey-lighten-4 text-subtitle-2">
         <div>
@@ -499,7 +549,7 @@ onBeforeUnmount(() => {
         </div>
         <v-btn icon variant="text" size="x-small" @click="modalOpen = false"><XIcon size="16" /></v-btn>
       </v-card-title>
-      
+       
       <v-card-text class="pa-4" style="max-height: 60vh;">
         <v-row dense class="text-caption">
           <v-col cols="6" class="py-1">

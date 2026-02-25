@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch, onBeforeUnmount } from 'vue'; 
+import { ref, reactive, onMounted, onBeforeUnmount, computed } from 'vue'; 
 import { format } from 'date-fns';
-import AsyncSelect from '@/components/common/AsyncSelect.vue';
 import { useAuthStore } from '@/stores/auth';
+
+// HAPUS import AsyncSelect karena kita ganti dengan v-autocomplete native
+// import AsyncSelect from '@/components/common/AsyncSelect.vue';
 
 import { 
   PlusIcon, 
@@ -19,8 +21,14 @@ import {
 const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 const authStore = useAuthStore();
 
-let searchTimeout: ReturnType<typeof setTimeout> | null = null; 
+// --- STATE UNTUK DROPDOWN (SEARCH LOKAL) ---
+const customerList = ref<any[]>([]);
+const loadingCustomers = ref(false);
 
+const itemList = ref<any[]>([]);
+const loadingItems = ref(false);
+
+// --- STATE UNTUK LIST UTAMA ---
 const search = ref('');
 const loadingList = ref(false);
 const jobOrderList = ref<any[]>([]);
@@ -56,11 +64,46 @@ const showMsg = (text: string, color = 'success') => {
   snackbar.text = text; snackbar.color = color; snackbar.show = true;
 };
 
+// --- FUNGSI AMBIL DATA MASTER (HANYA SEKALI) ---
+
+const fetchCustomers = async () => {
+  loadingCustomers.value = true;
+  try {
+    // Backend yang sudah kita perbaiki akan mengembalikan SEMUA data
+    const res = await fetch(`${API_BASE_URL}/JobOrder/MasterCustomer.php`);
+    const json = await res.json();
+    if (json.s && Array.isArray(json.d)) {
+      customerList.value = json.d;
+    }
+  } catch (e) {
+    showMsg('Gagal memuat data customer', 'error');
+  } finally {
+    loadingCustomers.value = false;
+  }
+};
+
+const fetchItems = async () => {
+  loadingItems.value = true;
+  try {
+    const res = await fetch(`${API_BASE_URL}/JobOrder/MasterItem.php`);
+    const json = await res.json();
+    if (json.s && Array.isArray(json.d)) {
+      itemList.value = json.d;
+    }
+  } catch (e) {
+    showMsg('Gagal memuat data item', 'error');
+  } finally {
+    loadingItems.value = false;
+  }
+};
+
+// --- FUNGSI AMBIL LIST TRANSAKSI ---
+
 const fetchList = async () => {
   loadingList.value = true;
   try {
     const url = new URL(`${API_BASE_URL}/JobOrder/List.php`);
-    if (search.value) url.searchParams.append("q", search.value);
+    // Tidak perlu append query 'q' karena kita filter di client
     
     const res = await fetch(url.toString());
     const json = await res.json();
@@ -73,16 +116,29 @@ const fetchList = async () => {
       jobOrderList.value = [];
     }
   } catch (e) {
-    showMsg('Gagal memuat data', 'error');
+    showMsg('Gagal memuat data list', 'error');
   } finally {
     loadingList.value = false;
   }
 };
 
-watch(search, () => {
-  if (searchTimeout) clearTimeout(searchTimeout); 
-  searchTimeout = setTimeout(fetchList, 600); 
+// --- LOGIKA FILTERING LIST UTAMA (CLIENT SIDE) ---
+const filteredJobOrderList = computed(() => {
+  if (!search.value) return jobOrderList.value;
+  const query = search.value.toLowerCase();
+  
+  return jobOrderList.value.filter((item: any) => {
+    return (
+      (item.number && item.number.toLowerCase().includes(query)) ||
+      (item.customerName && item.customerName.toLowerCase().includes(query)) ||
+      (item.pic && item.pic.toLowerCase().includes(query)) ||
+      (item.description && item.description.toLowerCase().includes(query)) ||
+      (item.status && item.status.toLowerCase().includes(query))
+    );
+  });
 });
+
+// --- LOGIKA FORM HANDLING ---
 
 const addItem = () => {
   form.items.push({ id: Date.now(), no: '', name: '', quantity: 1 });
@@ -92,17 +148,22 @@ const removeItem = (index: number) => {
   if (form.items.length > 1) form.items.splice(index, 1);
 };
 
-const onItemChange = (index: number, obj: any) => {
-  if (obj) {
-    form.items[index].no = obj.no;
-    form.items[index].name = obj.name;
+// Handler ketika Item dipilih di v-autocomplete
+const onItemChange = (index: number, val: any) => {
+  // Cari object item penuh berdasarkan 'no' yang dipilih
+  const selectedItem = itemList.value.find(i => i.no === val);
+  if (selectedItem) {
+    form.items[index].no = selectedItem.no;
+    form.items[index].name = selectedItem.name;
   }
 };
 
-const onCustomerChange = (obj: any) => {
-  if(obj) {
-    form.customerName = obj.name;
-    form.customerNo = obj.customerNo;
+// Handler ketika Customer dipilih di v-autocomplete
+const onCustomerChange = (val: any) => {
+  const selectedCustomer = customerList.value.find(c => c.customerNo === val);
+  if(selectedCustomer) {
+    form.customerName = selectedCustomer.name;
+    form.customerNo = selectedCustomer.customerNo;
   }
 };
 
@@ -176,12 +237,15 @@ const openDetail = async (id: number) => {
   }
 };
 
+// Ambil semua data master saat komponen dimuat
 onMounted(() => {
-  fetchList();
+  fetchCustomers(); // Ambil Master Customer sekali saja
+  fetchItems();     // Ambil Master Item sekali saja
+  fetchList();      // Ambil List Transaksi
 });
 
 onBeforeUnmount(() => {
-  if (searchTimeout) clearTimeout(searchTimeout);
+  // Cleanup jika perlu
 });
 </script>
 
@@ -226,17 +290,21 @@ onBeforeUnmount(() => {
               ></v-text-field>
               
               <div class="mb-2">
-                <AsyncSelect 
+                <v-autocomplete 
                   label="Select Customer"
-                  :apiEndpoint="`${API_BASE_URL}/JobOrder/MasterCustomer.php`"
+                  :items="customerList"
                   v-model="form.customerNo"
                   item-title="name"
                   item-value="customerNo"
-                  @change="onCustomerChange"
+                  @update:model-value="onCustomerChange"
+                  :loading="loadingCustomers"
+                  variant="outlined"
                   density="compact"
                   hide-details
                   class="small-input"
-                />
+                  placeholder="Type to search customer..."
+                  clearable
+                ></v-autocomplete>
               </div>
 
               <v-text-field 
@@ -297,17 +365,21 @@ onBeforeUnmount(() => {
                   <tbody>
                     <tr v-for="(item, index) in form.items" :key="item.id">
                       <td class="py-1 item-cell">
-                        <AsyncSelect 
-                          :apiEndpoint="`${API_BASE_URL}/JobOrder/MasterItem.php`"
-                          v-model="item.no"
+                        <v-autocomplete 
                           label="Select Item"
+                          :items="itemList"
+                          v-model="item.no"
                           item-title="name"
                           item-value="no"
-                          @change="(obj: any) => onItemChange(index, obj)"
+                          @update:model-value="(val) => onItemChange(index, val)"
+                          :loading="loadingItems"
+                          variant="outlined"
                           density="compact"
                           hide-details
                           class="small-input-in-table"
-                        />
+                          placeholder="Search item..."
+                          clearable
+                        ></v-autocomplete>
                       </td>
                       <td class="align-top py-1 item-cell">
                         <v-text-field 
@@ -396,7 +468,7 @@ onBeforeUnmount(() => {
 
         <v-data-table
           :headers="headers"
-          :items="jobOrderList"
+          :items="filteredJobOrderList"
           :loading="loadingList"
           density="compact"
           hover
@@ -424,8 +496,8 @@ onBeforeUnmount(() => {
           </template>
           
           <template v-slot:item.description="{ item }">
-                        <span class="text-caption">{{ item.description.length > 50 ? item.description.substring(0, 50) + '...' : item.description }}</span>
-                    </template>
+              <span class="text-caption">{{ item.description.length > 50 ? item.description.substring(0, 50) + '...' : item.description }}</span>
+          </template>
 
           <template v-slot:item.status="{ item }">
             <v-chip 

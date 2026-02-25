@@ -8,7 +8,7 @@ import {
   CheckIcon,
   XIcon,
     UsersIcon,
-    DeviceFloppyIcon // Tambahkan icon untuk konsistensi save
+    DeviceFloppyIcon 
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
@@ -38,7 +38,8 @@ const dialogPerm = ref(false);
 const selectedUser = ref<any>(null);
 const selectedPerms = ref<string[]>([]);
 
-// DAFTAR MENU LENGKAP (Dipertahankan seperti asli)
+// --- KONFIGURASI MENU LIST ---
+// Di sini kita mengatur key yang akan disimpan ke database
 const menuList = [
   { header: 'Menu Utama' },
   { key: 'dashboard', label: 'Dashboard' },
@@ -54,6 +55,7 @@ const menuList = [
   { header: 'Laporan & Analisis' },
   { key: 'laporan', label: 'Laporan Keuangan' },
   { key: 'rekon', label: 'Rekonsiliasi Bank' },
+  { key: 'user_activity', label: 'Aktivitas User' },
 
   { header: 'Master Data' },
   { key: 'master_tax', label: 'Setting Pajak' },
@@ -62,14 +64,16 @@ const menuList = [
   { key: 'users', label: 'Manajemen User' },
   { key: 'approver_settings', label: 'Setting Approver' },
   { key: 'settings', label: 'Konfigurasi Sistem' },
+  // SINGLE CHECKLIST UNTUK PAYROLL SYSTEM
+  { key: 'payroll_system', label: 'Payroll System' }
 ];
 
 // UPDATE: Menambahkan kolom 'avatar' dan 'email' pada header
 const headers = [
   { title: 'No', key: 'index', align: 'center' as const, sortable: false, width: '50px' },
-  { title: 'Foto', key: 'avatar', align: 'center' as const, sortable: false, width: '70px' }, // Kolom Foto
+  { title: 'Foto', key: 'avatar', align: 'center' as const, sortable: false, width: '70px' }, 
   { title: 'User Info', key: 'userInfo', align: 'start' as const, sortable: false },
-  { title: 'Email', key: 'email', align: 'start' as const, sortable: false }, // Kolom Email
+  { title: 'Email', key: 'email', align: 'start' as const, sortable: false }, 
   { title: 'Role', key: 'role', align: 'start' as const, sortable: false },
   { title: 'Access', key: 'access', align: 'center' as const, sortable: false, width: '150px' },
   { title: 'Actions', key: 'actions', align: 'center' as const, sortable: false, width: '100px' },
@@ -90,7 +94,6 @@ const fetchUsers = async () => {
   try {
     const res = await fetch(`${API_BASE_URL}/Users/List.php`);
     const json = await res.json();
-    // FIX: Tambahkan indexing pada data user
     if (json.s) users.value = json.d.map((u: any, index: number) => ({ ...u, index: index + 1 }));
   } catch (e) {
     showMsg("Gagal memuat list user", "error");
@@ -130,7 +133,7 @@ const deleteUser = async (id: number) => {
   
   deletingUser.value = true; 
     const originalSelectedUser = selectedUser.value;
-    selectedUser.value = { id }; // Set selected user for button loading indicator
+    selectedUser.value = { id }; 
     
   try {
     const res = await fetch(`${API_BASE_URL}/Users/Delete.php`, {

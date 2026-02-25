@@ -14,7 +14,8 @@ const authStore = useAuthStore();
 const sidebarMenu = shallowRef(sidebarItems);
 
 // Mapping Key Menu sesuai database
-// Pastikan 'title' atau properti lain di sidebarItem.ts cocok dengan key ini
+// Key sebelah KIRI harus sama persis dengan 'title' di sidebarItem.ts
+// Value sebelah KANAN harus sama persis dengan 'key' di UserSettingPage.vue
 const menuKeyMap: Record<string, string> = {
     'Dashboard': 'dashboard',
     'Job Order': 'job_order',
@@ -24,20 +25,21 @@ const menuKeyMap: Record<string, string> = {
     'Penerimaan Lain': 'penerimaan',
     'Transfer Bank': 'transfer',
     'Laporan': 'laporan',
-    'Aktivitas User': 'laporan', // Mapping menu baru ke permission 'laporan'
-    'Rekonsiliasi Bank': 'rekon',   
-    'Setting Pajak': 'master_tax',   
+    'Aktivitas User': 'laporan', 
+    'Rekonsiliasi Bank': 'rekon',    
+    'Setting Pajak': 'master_tax',    
     'Manajemen User': 'users',
     'Setting Approver': 'approver_settings', 
     'Konfigurasi Sistem': 'settings',
-    'Profile Setting': 'profile_settings' // PENAMBAHAN MAPPING BARU
+    'Profile Setting': 'profile_settings',
+    
+    // --- TAMBAHAN MAPPING PAYROLL ---
+    'Payroll System': 'payroll_system' 
 };
 
 // Logic Filter Flat Array Sidebar
 const displayedItems = computed(() => {
-    // Asumsi: Semua user harus bisa mengakses Profile Setting,
-    // kecuali jika ada permission khusus. Jika tidak ada permission
-    // khusus, kembalikan true.
+    // Admin selalu melihat semua menu
     if (authStore.isAdmin) return sidebarMenu.value;
     
     const userPerms = authStore.userData?.permissions || [];
@@ -46,21 +48,22 @@ const displayedItems = computed(() => {
         // Selalu tampilkan Header
         if (item.header) return true;
 
-        // Jika item punya children (seperti Rekonsiliasi Bank)
+        // Cek menu dengan submenu (Children) seperti Payroll System
         if (item.children) {
             const parentKey = menuKeyMap[item.title || ''];
-            // Tampilkan parent jika user punya hak akses ke parentKey ('rekon')
+            
+            // Jika user punya permission 'payroll_system', tampilkan parent beserta anaknya
             if (parentKey && userPerms.includes(parentKey)) {
                 return true;
             }
-            // Jika tidak ada permission untuk parent, jangan tampilkan
+            // Jika tidak ada izin, sembunyikan seluruh grup
             return false;
         }
 
-        // Cek item level 1 yang biasa (tanpa children)
+        // Cek item level 1 (Single Link)
         const key = menuKeyMap[item.title || ''];
         
-        // Tampilkan Profile Setting, Dashboard, dan menu yang tidak di-map secara default
+        // Tampilkan Profile Setting, Dashboard default
         if (!key || key === 'dashboard' || key === 'profile_settings') return true; 
         
         return userPerms.includes(key);

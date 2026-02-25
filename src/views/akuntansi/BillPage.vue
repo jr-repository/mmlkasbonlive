@@ -3,45 +3,66 @@ import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { format } from 'date-fns';
 import { useAuthStore } from '@/stores/auth';
 import UiParentCard from '@/components/shared/UiParentCard.vue';
-import AsyncSelect from '@/components/common/AsyncSelect.vue';
+// HAPUS AsyncSelect KARENA DIGANTI V-AUTOCOMPLETE
+// import AsyncSelect from '@/components/common/AsyncSelect.vue';
 import { 
-PlusIcon, TrashIcon, EyeIcon, DeviceFloppyIcon, XIcon, WalletIcon,
-CheckIcon, BanIcon, PencilIcon, FileInvoiceIcon, TagIcon, SearchIcon, ListCheckIcon, FormsIcon, RefreshIcon
+ PlusIcon, TrashIcon, EyeIcon, DeviceFloppyIcon, XIcon, WalletIcon,
+ CheckIcon, BanIcon, PencilIcon, FileInvoiceIcon, TagIcon, SearchIcon, ListCheckIcon, FormsIcon, RefreshIcon
 } from 'vue-tabler-icons';
 
 const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 const authStore = useAuthStore();
 
 // --- STATE NAVIGASI TAB BARU ---
-const tab = ref(1); // Default ke Tab 1 (History)
+const tab = ref(1); 
 
-// FIX: Tambahkan variabel untuk debounce timer
-let searchTimeout: ReturnType<typeof setTimeout> | null = null;
-
-
+// --- STATE LIST DATA ---
 const loadingList = ref(false);
-const billList = ref<any[]>([]);
-const search = ref('');
+const billList = ref<any[]>([]); // Menyimpan seluruh data bill
+const search = ref(''); // Input pencarian
 const taxList = ref<any[]>([]); 
 
+// --- STATE DROPDOWN (SEARCH LOKAL) ---
+const vendorList = ref<any[]>([]);
+const loadingVendors = ref(false);
+
+const itemList = ref<any[]>([]);
+const loadingItems = ref(false);
+
+// --- FORM STATE ---
 const form = reactive({
-id: 0, 
-transDate: format(new Date(), 'yyyy-MM-dd'),
-vendorNo: '',
-vendorName: '',
-description: '',
-globalDiscPercent: 0,
-downPayment: 0,
-items: [
- { 
- id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', 
- ppnRate: 0, pphRate: 0 
- }
-]
+ id: 0, 
+ transDate: format(new Date(), 'yyyy-MM-dd'),
+ vendorNo: '',
+ vendorName: '',
+ description: '',
+ globalDiscPercent: 0,
+ downPayment: 0,
+ items: [
+  { 
+  id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', 
+  ppnRate: 0, pphRate: 0 
+  }
+ ]
 });
 const saving = ref(false);
 const isEditing = ref(false);
 
+// --- MODAL DETAIL ITEM STATE (BARU) ---
+const dialogItemDetail = ref(false);
+const editingItemIndex = ref(-1);
+const itemDetailForm = reactive({
+ itemNo: '', 
+ itemName: '', 
+ quantity: 1, 
+ unitPrice: 0, 
+ itemDiscPercent: '', 
+ ppnRate: 0, 
+ pphRate: 0,
+ asyncSelectValue: null as any 
+});
+
+// --- DETAIL & APPROVAL STATE ---
 const dialogDetail = ref(false);
 const detailData = ref<any>(null);
 const approving = ref(false);
@@ -49,238 +70,313 @@ const rejecting = ref(false);
 
 const snackbar = reactive({ show: false, text: '', color: 'success' });
 const showMsg = (text: string, color = 'success') => {
-snackbar.text = text; snackbar.color = color; snackbar.show = true;
+ snackbar.text = text; snackbar.color = color; snackbar.show = true;
 };
 
+// --- COMPUTED ---
 const canApprove = computed(() => {
-return authStore.userData?.approvals?.includes('BILL') || authStore.userData?.role === 'admin';
+ return authStore.userData?.approvals?.includes('BILL') || authStore.userData?.role === 'admin';
 });
 
 const ppnOptions = computed(() => [{name:'Non PPN', rate:0}, ...taxList.value.filter(x => x.type === 'PPN')]);
 const pphOptions = computed(() => [{name:'Non PPh', rate:0}, ...taxList.value.filter(x => x.type === 'PPH')]);
 
 const subtotal = computed(() => {
-return form.items.reduce((acc, item) => {
- let price = Number(item.unitPrice) || 0;
- let qty = Number(item.quantity) || 0;
- let discVal = parseFloat(item.itemDiscPercent || '0') || 0;
- let gross = price * qty;
- let net = gross - (gross * discVal / 100);
- return acc + net;
-}, 0);
+ return form.items.reduce((acc, item) => {
+  let price = Number(item.unitPrice) || 0;
+  let qty = Number(item.quantity) || 0;
+  let discVal = parseFloat(item.itemDiscPercent || '0') || 0;
+  let gross = price * qty;
+  let net = gross - (gross * discVal / 100);
+  return acc + net;
+ }, 0);
 });
 
 const discountAmount = computed(() => subtotal.value * (form.globalDiscPercent / 100));
 const taxableAmount = computed(() => subtotal.value - discountAmount.value);
 
 const totalPPN = computed(() => {
-let tot = 0;
-form.items.forEach(item => {
- let price = Number(item.unitPrice) * Number(item.quantity);
- let discVal = parseFloat(item.itemDiscPercent || '0') || 0;
- let net = price - (price * discVal/100);
- tot += (net * (Number(item.ppnRate)/100));
-});
-return tot * (1 - (form.globalDiscPercent/100));
+ let tot = 0;
+ form.items.forEach(item => {
+  let price = Number(item.unitPrice) * Number(item.quantity);
+  let discVal = parseFloat(item.itemDiscPercent || '0') || 0;
+  let net = price - (price * discVal/100);
+  tot += (net * (Number(item.ppnRate)/100));
+ });
+ return tot * (1 - (form.globalDiscPercent/100));
 });
 
 const totalPPh = computed(() => {
-let tot = 0;
-form.items.forEach(item => {
- let price = Number(item.unitPrice) * Number(item.quantity);
- let discVal = parseFloat(item.itemDiscPercent || '0') || 0;
- let net = price - (price * discVal/100);
- tot += (net * (Number(item.pphRate)/100));
-});
-return tot * (1 - (form.globalDiscPercent/100));
+ let tot = 0;
+ form.items.forEach(item => {
+  let price = Number(item.unitPrice) * Number(item.quantity);
+  let discVal = parseFloat(item.itemDiscPercent || '0') || 0;
+  let net = price - (price * discVal/100);
+  tot += (net * (Number(item.pphRate)/100));
+ });
+ return tot * (1 - (form.globalDiscPercent/100));
 });
 
-const grandTotal = computed(() => taxableAmount.value + totalPPN.value - totalPPh.value); // FIX: PPh seharusnya mengurangi grandTotal
+const grandTotal = computed(() => taxableAmount.value + totalPPN.value - totalPPh.value); 
 const netBalance = computed(() => grandTotal.value - form.downPayment);
 
+// --- CLIENT-SIDE FILTERING ---
+const filteredBillList = computed(() => {
+  if (!search.value) return billList.value;
+  const query = search.value.toLowerCase();
+  
+  return billList.value.filter((item: any) => 
+    (item.number && item.number.toLowerCase().includes(query)) ||
+    (item.vendorName && item.vendorName.toLowerCase().includes(query)) ||
+    (item.status && item.status.toLowerCase().includes(query))
+  );
+});
+
+// --- METHODS AMBIL DATA MASTER (SEKALI SAJA) ---
+const fetchVendors = async () => {
+  loadingVendors.value = true;
+  try {
+    const res = await fetch(`${API_BASE_URL}/Bill/MasterVendor.php`);
+    const json = await res.json();
+    if (json.s && Array.isArray(json.d)) {
+      vendorList.value = json.d;
+    }
+  } catch (e) {
+    // Silent fail
+  } finally {
+    loadingVendors.value = false;
+  }
+};
+
+const fetchItems = async () => {
+  loadingItems.value = true;
+  try {
+    const res = await fetch(`${API_BASE_URL}/Bill/MasterItem.php`);
+    const json = await res.json();
+    if (json.s && Array.isArray(json.d)) {
+      itemList.value = json.d;
+    }
+  } catch (e) {
+    // Silent fail
+  } finally {
+    loadingItems.value = false;
+  }
+};
+
 const fetchTaxes = async () => {
-try {
- const res = await fetch(`${API_BASE_URL}/MasterData/Tax/List.php`);
- const json = await res.json();
- if(json.s) taxList.value = json.d;
-} catch {}
+ try {
+  const res = await fetch(`${API_BASE_URL}/MasterData/Tax/List.php`);
+  const json = await res.json();
+  if(json.s) taxList.value = json.d;
+ } catch {}
 };
 
 const getDefaultTax = (type: string) => {
-const t = taxList.value.find(x => x.type === type && x.isDefault);
-return t ? t.rate : 0;
+ const t = taxList.value.find(x => x.type === type && x.isDefault);
+ return t ? t.rate : 0;
 };
 
-// FIX: Pindahkan fetchList ke fungsi debounced
-const fetchListDebounced = () => {
-if (searchTimeout) clearTimeout(searchTimeout);
-searchTimeout = setTimeout(fetchList, 400); // FIX: Debounce 400ms untuk input pencarian
-};
-
+// --- METHODS LIST DATA ---
 const fetchList = async () => {
-loadingList.value = true;
-try {
- const url = new URL(`${API_BASE_URL}/Bill/List.php`);
- if(search.value) url.searchParams.append('q', search.value);
- const res = await fetch(url.toString());
- const json = await res.json();
- if(json.s) billList.value = json.d.map((x:any, i:number) => ({...x, index: i+1}));
-} finally { loadingList.value = false; }
+ loadingList.value = true;
+ try {
+  const url = new URL(`${API_BASE_URL}/Bill/List.php`);
+  // Hapus append 'q' agar semua data terambil, lalu difilter lokal
+  const res = await fetch(url.toString());
+  const json = await res.json();
+  if(json.s) billList.value = json.d.map((x:any, i:number) => ({...x, index: i+1}));
+ } finally { loadingList.value = false; }
 };
 
 const addItem = () => {
-form.items.push({ 
- id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', 
- ppnRate: getDefaultTax('PPN'), pphRate: getDefaultTax('PPH') 
-});
+ form.items.push({ 
+  id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', 
+  ppnRate: getDefaultTax('PPN'), pphRate: getDefaultTax('PPH') 
+ });
+ openItemDetailModal(form.items[form.items.length - 1], form.items.length - 1);
 };
 
 const removeItem = (idx: number) => {
-if(form.items.length > 1) form.items.splice(idx, 1);
+ if(form.items.length > 1) form.items.splice(idx, 1);
 };
 
-const onVendorChange = (obj: any) => {
-if(obj) {
- form.vendorNo = obj.vendorNo;
- form.vendorName = obj.name;
-}
+// Handler Vendor Change (v-autocomplete)
+const onVendorChange = (val: any) => {
+  const selected = vendorList.value.find(v => v.vendorNo === val);
+  if (selected) {
+    form.vendorNo = selected.vendorNo;
+    form.vendorName = selected.name;
+  }
 };
 
-const onItemChange = (idx: number, obj: any) => {
-if(obj) {
- form.items[idx].itemNo = obj.no;
- form.items[idx].itemName = obj.name;
- form.items[idx].unitPrice = obj.unitPrice || 0;
-}
+// Handler Item Change (v-autocomplete di modal)
+const onItemChange = (val: any) => {
+  const selected = itemList.value.find(i => i.no === val);
+  if (selected) {
+    itemDetailForm.itemNo = selected.no;
+    itemDetailForm.itemName = selected.name;
+    itemDetailForm.unitPrice = selected.unitPrice || 0;
+  }
 };
 
 const resetForm = () => {
-form.id = 0;
-form.vendorNo = ''; 
-form.vendorName = '';
-form.description = '';
-form.items = [{ id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', ppnRate: getDefaultTax('PPN'), pphRate: getDefaultTax('PPH') }];
-form.downPayment = 0; 
-form.globalDiscPercent = 0;
-isEditing.value = false;
+ form.id = 0;
+ form.vendorNo = ''; 
+ form.vendorName = '';
+ form.description = '';
+ form.items = [{ id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', ppnRate: getDefaultTax('PPN'), pphRate: getDefaultTax('PPH') }];
+ form.downPayment = 0; 
+ form.globalDiscPercent = 0;
+ isEditing.value = false;
 };
 
 const handleEdit = async (item: any) => {
-const res = await fetch(`${API_BASE_URL}/Bill/Detail.php?id=${item.id}`);
-const json = await res.json();
-if(json.s) {
- const d = json.d;
- form.id = d.id;
- form.transDate = d.transDate; 
- form.vendorNo = d.vendor.vendorNo;
- form.vendorName = d.vendor.name;
- form.description = d.description;
- form.globalDiscPercent = d.globalDiscPercent;
- form.downPayment = d.downPayment;
- 
- form.items = d.items.map((x:any) => ({
- id: Date.now() + Math.random(),
- itemNo: x.itemNo,
- itemName: x.itemName,
- quantity: x.quantity,
- unitPrice: x.unitPrice,
- itemDiscPercent: x.itemDiscPercent,
- ppnRate: x.ppnRate,
- pphRate: x.pphRate
- }));
- 
- isEditing.value = true;
- tab.value = 2; // Pindah ke tab New Entry setelah Edit
- window.scrollTo({ top: 0, behavior: 'smooth' });
-}
+ const res = await fetch(`${API_BASE_URL}/Bill/Detail.php?id=${item.id}`);
+ const json = await res.json();
+ if(json.s) {
+  const d = json.d;
+  form.id = d.id;
+  form.transDate = d.transDate; 
+  form.vendorNo = d.vendor.vendorNo;
+  form.vendorName = d.vendor.name;
+  form.description = d.description;
+  form.globalDiscPercent = d.globalDiscPercent;
+  form.downPayment = d.downPayment;
+  
+  form.items = d.items.map((x:any) => ({
+  id: Date.now() + Math.random(),
+  itemNo: x.itemNo,
+  itemName: x.itemName,
+  quantity: x.quantity,
+  unitPrice: x.unitPrice,
+  itemDiscPercent: x.itemDiscPercent,
+  ppnRate: x.ppnRate,
+  pphRate: x.pphRate
+  }));
+  
+  isEditing.value = true;
+  tab.value = 2; 
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+ }
 };
 
 const handleSubmit = async () => {
-if(!form.vendorNo) return showMsg("Pilih Vendor", "error");
-if(form.items.some(i => !i.itemNo)) return showMsg("Ada Item yang belum dipilih", "error");
+ if(!form.vendorNo) return showMsg("Pilih Vendor", "error");
+ if(form.items.some(i => !i.itemNo)) return showMsg("Ada Item yang belum dipilih", "error");
 
-saving.value = true;
-try {
- // Insert User Data
- const payload = {
-    ...form,
-    user_id: authStore.userData?.id,
-    user_name: authStore.userData?.name
- };
+ saving.value = true;
+ try {
+  const payload = {
+     ...form,
+     user_id: authStore.userData?.id,
+     user_name: authStore.userData?.name
+  };
 
- const res = await fetch(`${API_BASE_URL}/Bill/Transaksi.php`, {
- method: 'POST', body: JSON.stringify(payload)
- });
- const json = await res.json();
- if(json.s) {
- showMsg(json.message);
- fetchList();
- resetForm();
- tab.value = 1; // Pindah ke tab History setelah Submit
- } else {
- showMsg(json.message, "error");
- }
-} catch(e: any) { showMsg(e.message, "error"); } 
-finally { saving.value = false; }
+  const res = await fetch(`${API_BASE_URL}/Bill/Transaksi.php`, {
+  method: 'POST', body: JSON.stringify(payload)
+  });
+  const json = await res.json();
+  if(json.s) {
+  showMsg(json.message);
+  fetchList();
+  resetForm();
+  tab.value = 1; 
+  } else {
+  showMsg(json.message, "error");
+  }
+ } catch(e: any) { showMsg(e.message, "error"); } 
+ finally { saving.value = false; }
 };
 
 const handleApprove = async (id: number) => {
-if(!confirm("Yakin Approve? Data akan dikirim ke Accurate.")) return;
-approving.value = true;
-try {
- const res = await fetch(`${API_BASE_URL}/Bill/Approve.php`, {
- method: 'POST', body: JSON.stringify({ id, user_id: authStore.userData?.id })
- });
- const json = await res.json();
- if(json.s) {
- showMsg(json.message);
- fetchList();
- dialogDetail.value = false;
- } else {
- showMsg(json.message, "error");
- }
-} catch { showMsg("Error koneksi", "error"); }
-finally { approving.value = false; }
+ if(!confirm("Yakin Approve? Data akan dikirim ke Accurate.")) return;
+ approving.value = true;
+ try {
+  const res = await fetch(`${API_BASE_URL}/Bill/Approve.php`, {
+  method: 'POST', body: JSON.stringify({ id, user_id: authStore.userData?.id })
+  });
+  const json = await res.json();
+  if(json.s) {
+  showMsg(json.message);
+  fetchList();
+  dialogDetail.value = false;
+  } else {
+  showMsg(json.message, "error");
+  }
+ } catch { showMsg("Error koneksi", "error"); }
+ finally { approving.value = false; }
 };
 
 const handleReject = async (id: number) => {
-if(!confirm("Yakin Reject?")) return;
-rejecting.value = true;
-try {
- const res = await fetch(`${API_BASE_URL}/Bill/Reject.php`, {
- method: 'POST', body: JSON.stringify({ id, user_id: authStore.userData?.id })
- });
- const json = await res.json();
- if(json.s) {
- showMsg(json.message, "warning");
- fetchList();
- dialogDetail.value = false;
- } else {
- showMsg(json.message, "error");
- }
-} catch { showMsg("Error koneksi", "error"); }
-finally { rejecting.value = false; }
+ if(!confirm("Yakin Reject?")) return;
+ rejecting.value = true;
+ try {
+  const res = await fetch(`${API_BASE_URL}/Bill/Reject.php`, {
+  method: 'POST', body: JSON.stringify({ id, user_id: authStore.userData?.id })
+  });
+  const json = await res.json();
+  if(json.s) {
+  showMsg(json.message, "warning");
+  fetchList();
+  dialogDetail.value = false;
+  } else {
+  showMsg(json.message, "error");
+  }
+ } catch { showMsg("Error koneksi", "error"); }
+ finally { rejecting.value = false; }
 };
 
 const openDetail = async (id: number) => {
-dialogDetail.value = true;
-detailData.value = null;
-const res = await fetch(`${API_BASE_URL}/Bill/Detail.php?id=${id}`);
-const json = await res.json();
-if(json.s) detailData.value = json.d;
+ dialogDetail.value = true;
+ detailData.value = null;
+ const res = await fetch(`${API_BASE_URL}/Bill/Detail.php?id=${id}`);
+ const json = await res.json();
+ if(json.s) detailData.value = json.d;
 };
 
-// FIX: Gunakan watch untuk memanggil fetchList Debounced saat search berubah
-watch(search, fetchListDebounced); 
+const openItemDetailModal = (item: any, index: number) => {
+ editingItemIndex.value = index;
+ itemDetailForm.itemNo = item.itemNo;
+ itemDetailForm.itemName = item.itemName;
+ itemDetailForm.quantity = item.quantity;
+ itemDetailForm.unitPrice = item.unitPrice;
+ itemDetailForm.itemDiscPercent = item.itemDiscPercent;
+ itemDetailForm.ppnRate = item.ppnRate;
+ itemDetailForm.pphRate = item.pphRate;
+ itemDetailForm.asyncSelectValue = item.itemNo;
+ dialogItemDetail.value = true;
+};
 
-onMounted(() => {
-fetchTaxes().then(() => {
- if(form.items.length > 0) {
- form.items[0].ppnRate = getDefaultTax('PPN');
- form.items[0].pphRate = getDefaultTax('PPH');
+const saveItemDetail = () => {
+ if (editingItemIndex.value >= 0) {
+  if(!itemDetailForm.itemName) {
+   return showMsg("Pilih Item terlebih dahulu!", "error");
+  }
+
+  const index = editingItemIndex.value;
+  form.items[index].itemNo = itemDetailForm.itemNo;
+  form.items[index].itemName = itemDetailForm.itemName;
+  form.items[index].quantity = Number(itemDetailForm.quantity);
+  form.items[index].unitPrice = Number(itemDetailForm.unitPrice);
+  form.items[index].itemDiscPercent = String(itemDetailForm.itemDiscPercent);
+  form.items[index].ppnRate = Number(itemDetailForm.ppnRate);
+  form.items[index].pphRate = Number(itemDetailForm.pphRate);
  }
-});
-fetchList();
+ dialogItemDetail.value = false;
+ editingItemIndex.value = -1;
+};
+
+// --- HOOKS ---
+onMounted(() => {
+ fetchVendors(); // Load Master Vendor
+ fetchItems();   // Load Master Item
+ fetchTaxes().then(() => {
+  if(form.items.length > 0) {
+  form.items[0].ppnRate = getDefaultTax('PPN');
+  form.items[0].pphRate = getDefaultTax('PPH');
+  }
+ });
+ fetchList(); // Load Transaksi
 });
 </script>
 
@@ -303,14 +399,14 @@ fetchList();
 <v-row class="mt-0">
  <v-col cols="12">
  <v-card elevation="4" rounded="lg" class="border overflow-hidden">
-            <v-tabs v-model="tab" color="primary" class="bg-grey-lighten-4" density="compact" grow>
-     <v-tab :value="1" class="text-none font-weight-bold">
-      <ListCheckIcon size="18" class="mr-2"/> Transaction History
-     </v-tab>
-     <v-tab :value="2" class="text-none font-weight-bold">
-      <FormsIcon size="18" class="mr-2"/> New Bill Entry
-     </v-tab>
-    </v-tabs>
+             <v-tabs v-model="tab" color="primary" class="bg-grey-lighten-4" density="compact" grow>
+      <v-tab :value="1" class="text-none font-weight-bold">
+       <ListCheckIcon size="18" class="mr-2"/> Transaction History
+      </v-tab>
+      <v-tab :value="2" class="text-none font-weight-bold">
+       <FormsIcon size="18" class="mr-2"/> New Bill Entry
+      </v-tab>
+     </v-tabs>
 
         <v-window v-model="tab">
             <v-window-item :value="1">
@@ -363,7 +459,7 @@ fetchList();
                             { title: 'Status', key: 'status', align:'center' as const },
                             { title: 'Action', key: 'actions', align:'center' as const }
                         ]" 
-                        :items="billList" 
+                        :items="filteredBillList" 
                         :loading="loadingList" 
                         density="compact"
                         hover
@@ -429,17 +525,21 @@ fetchList();
                                 class="mb-2 small-input"
                             ></v-text-field>
                             
-                            <AsyncSelect 
+                            <v-autocomplete 
                                 label="Select Vendor" 
-                                :apiEndpoint="`${API_BASE_URL}/Bill/MasterVendor.php`" 
+                                :items="vendorList" 
                                 item-title="name" 
                                 item-value="vendorNo"
                                 v-model="form.vendorNo"
-                                @change="onVendorChange"
+                                @update:model-value="onVendorChange"
+                                :loading="loadingVendors"
                                 density="compact"
                                 hide-details
+                                variant="outlined"
                                 class="mb-2 small-input"
+                                placeholder="Search vendor..."
                             />
+
                             <v-textarea 
                                 label="Bill Description / Notes" 
                                 v-model="form.description" 
@@ -457,7 +557,7 @@ fetchList();
                                 <v-table density="compact" class="bg-transparent item-table-form compact-invoice-table">
                                     <thead>
                                         <tr class="bg-grey-lighten-4">
-                                            <th class="font-weight-bold text-primary text-caption" width="250">Item / Expense</th>
+                                            <th class="font-weight-bold text-primary text-caption" width="250">Item / Expense (Click to Edit)</th>
                                             <th class="text-center font-weight-bold text-primary text-caption" width="80">Qty</th>
                                             <th class="text-center font-weight-bold text-primary text-caption" width="120">Unit Price</th>
                                             <th class="text-center font-weight-bold text-primary text-caption" width="80">Disc (%)</th>
@@ -467,35 +567,35 @@ fetchList();
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr v-for="(item, i) in form.items" :key="item.id">
-                                            <td class="py-1 item-cell align-top">
-                                                <AsyncSelect 
-                                                    :apiEndpoint="`${API_BASE_URL}/Bill/MasterItem.php`"
-                                                    item-title="name" item-value="no"
-                                                    v-model="item.itemNo"
-                                                    label="Select Item..."
-                                                    @change="(o:any)=>onItemChange(i,o)"
-                                                    density="compact" hide-details 
-                                                    class="small-input-in-table bg-white"
-                                                />
+                                        <tr v-for="(item, i) in form.items" :key="item.id" class="hover-row">
+                                            <td class="py-1 item-cell" @click="openItemDetailModal(item, i)">
+                                                <div class="text-primary font-weight-bold text-caption item-name-link">{{ item.itemName || 'Click to Select Item' }}</div>
+                                                <div class="text-xsmall text-medium-emphasis font-mono">{{ item.itemNo }}</div>
                                             </td>
-                                            <td class="align-top py-1 item-cell">
-                                                <v-text-field type="number" v-model="item.quantity" density="compact" hide-details variant="outlined" class="centered-input small-input-in-table bg-white"></v-text-field>
+                                            <td class="align-top py-1 text-center text-caption font-weight-medium">
+                                                {{ item.quantity.toLocaleString() }}
                                             </td>
-                                            <td class="align-top py-1 item-cell">
-                                                <v-text-field type="number" v-model="item.unitPrice" density="compact" hide-details variant="outlined" class="text-right-input small-input-in-table bg-white"></v-text-field>
+                                            <td class="align-top py-1 text-right text-caption font-weight-medium">
+                                                Rp {{ Number(item.unitPrice).toLocaleString('id-ID') }}
                                             </td>
-                                            <td class="align-top py-1 item-cell">
-                                                <v-text-field v-model="item.itemDiscPercent" placeholder="%" density="compact" hide-details variant="outlined" class="centered-input small-input-in-table bg-white"></v-text-field>
+                                            <td class="align-top py-1 text-center text-caption font-weight-medium">
+                                                {{ item.itemDiscPercent || '0' }}%
                                             </td>
-                                            <td class="align-top py-1 item-cell">
-                                                <v-select v-model="item.ppnRate" :items="ppnOptions" item-title="name" item-value="rate" density="compact" hide-details variant="outlined" class="small-select small-input-in-table bg-white"></v-select>
+                                            <td class="align-top py-1 text-center text-caption">
+                                                {{ item.ppnRate }}%
                                             </td>
-                                            <td class="align-top py-1 item-cell">
-                                                <v-select v-model="item.pphRate" :items="pphOptions" item-title="name" item-value="rate" density="compact" hide-details variant="outlined" class="small-select small-input-in-table bg-white"></v-select>
+                                            <td class="align-top py-1 text-center text-caption">
+                                                {{ item.pphRate }}%
                                             </td>
                                             <td class="text-center align-top py-1">
-                                                <v-btn icon variant="text" color="error" size="x-small" @click="removeItem(i)" :disabled="form.items.length <= 1">
+                                                <v-btn 
+                                                    icon 
+                                                    variant="text" 
+                                                    color="error" 
+                                                    size="x-small" 
+                                                    @click="removeItem(i)" 
+                                                    :disabled="form.items.length <= 1"
+                                                >
                                                     <TrashIcon size="16"/>
                                                 </v-btn>
                                             </td>
@@ -505,7 +605,7 @@ fetchList();
                                 <v-divider></v-divider>
                                 <div class="px-2 py-2 bg-white">
                                     <v-btn block color="primary" variant="tonal" class="rounded-lg text-caption text-none" size="x-small" prepend-icon="mdi-plus" @click="addItem">
-                                        Add Another Item
+                                            Add Another Item
                                     </v-btn>
                                 </div>
                             </v-card>
@@ -590,132 +690,253 @@ fetchList();
  </v-col>
 </v-row>
 
+  <v-dialog v-model="dialogItemDetail" max-width="500" transition="dialog-bottom-transition" persistent>
+  <v-card class="rounded-lg overflow-hidden small-dialog-card">
+   <div class="bg-gradient-smooth px-4 py-3 d-flex justify-space-between align-center">
+    <div class="d-flex align-center gap-2">
+     <div class="bg-white rounded-circle pa-1 d-flex">
+      <PencilIcon size="16" class="text-primary" />
+     </div>
+     <div>
+      <span class="text-subtitle-1 font-weight-bold text-white d-block" style="line-height: 1.2;">Edit Item Detail</span>
+      <span class="text-caption text-white opacity-80 font-weight-normal">({{ itemDetailForm.itemName || 'No Item Selected' }})</span>
+     </div>
+    </div>
+    <v-btn icon variant="text" color="white" size="small" @click="dialogItemDetail = false">
+     <XIcon size="18" />
+    </v-btn>
+   </div>
+   
+   <v-card-text class="pa-4 bg-grey-lighten-5 dialog-detail-content">
+    
+        <v-row no-gutters class="mb-3">
+     <div class="text-caption font-weight-bold mb-1 d-block text-primary">Item / Expense</div>
+     <v-autocomplete 
+      label="Select Item" 
+      :items="itemList" 
+      item-title="name" 
+      item-value="no"
+      v-model="itemDetailForm.itemNo"
+      @update:model-value="(val) => { onItemChange(val); itemDetailForm.asyncSelectValue = val }"
+      :loading="loadingItems"
+      density="compact"
+      hide-details
+      variant="outlined"
+      class="small-input"
+      placeholder="Search item..."
+     />
+    </v-row>
+
+        <v-row no-gutters class="d-flex gap-4">
+     <div style="flex-grow: 1;">
+      <div class="text-caption font-weight-bold mb-1 d-block text-primary">Quantity</div>
+      <v-text-field 
+       type="number" 
+       label="Qty"
+       v-model="itemDetailForm.quantity" 
+       density="compact" 
+       hide-details 
+       variant="outlined" 
+       class="centered-input small-input bg-white"
+      ></v-text-field>
+     </div>
+     <div style="flex-grow: 2;">
+      <div class="text-caption font-weight-bold mb-1 d-block text-primary">Unit Price</div>
+      <v-text-field 
+       type="number" 
+       label="Price"
+       v-model="itemDetailForm.unitPrice" 
+       density="compact" 
+       hide-details 
+       variant="outlined"
+       class="text-right-input small-input bg-white"
+       prefix="Rp"
+      ></v-text-field>
+     </div>
+     <div style="width: 100px;">
+      <div class="text-caption font-weight-bold mb-1 d-block text-primary">Disc (%)</div>
+      <v-text-field 
+       type="number" 
+       label="Disc"
+       v-model="itemDetailForm.itemDiscPercent" 
+       density="compact" 
+       hide-details 
+       variant="outlined"
+       class="centered-input small-input bg-white"
+       suffix="%"
+      ></v-text-field>
+     </div>
+    </v-row>
+
+        <v-row no-gutters class="mt-4 d-flex gap-4">
+     <div style="flex-grow: 1;">
+      <div class="text-caption font-weight-bold mb-1 d-block text-primary">PPN Rate</div>
+      <v-select 
+       v-model="itemDetailForm.ppnRate" 
+       :items="ppnOptions" 
+       item-title="name" 
+       item-value="rate" 
+       density="compact" 
+       hide-details 
+       variant="outlined" 
+       class="small-select small-input bg-white"
+      ></v-select>
+     </div>
+
+     <div style="flex-grow: 1;">
+      <div class="text-caption font-weight-bold mb-1 d-block text-primary">PPh Rate</div>
+      <v-select 
+       v-model="itemDetailForm.pphRate" 
+       :items="pphOptions" 
+       item-title="name" 
+       item-value="rate" 
+       density="compact" 
+       hide-details 
+       variant="outlined" 
+       class="small-select small-input bg-white"
+      ></v-select>
+     </div>
+    </v-row>
+
+   </v-card-text>
+   
+   <v-card-actions class="bg-white pa-3 justify-end border-top">
+    <v-btn color="grey-darken-1" variant="text" size="small" @click="dialogItemDetail = false" class="px-4 text-none text-caption">
+     Batal
+    </v-btn>
+    <v-btn color="primary" variant="flat" size="small" @click="saveItemDetail" class="px-4 text-none text-caption">
+     <DeviceFloppyIcon size="16" class="mr-1"/> Simpan
+    </v-btn>
+   </v-card-actions>
+  </v-card>
+ </v-dialog>
+
   <v-dialog v-model="dialogDetail" max-width="800" transition="dialog-bottom-transition" scrollable>
   <v-card class="rounded-lg overflow-hidden small-dialog-card" v-if="detailData">
-    <div class="bg-gradient-smooth px-4 py-3 d-flex justify-space-between align-center">
-      <div class="d-flex align-center gap-2">
-        <div class="bg-white rounded-circle pa-1 d-flex">
-          <TagIcon size="16" class="text-primary" />
-        </div>
-        <div>
-          <span class="text-subtitle-1 font-weight-bold text-white d-block" style="line-height: 1.2;">Bill Detail: #{{ detailData.number }}</span>
-          <span class="text-caption text-white opacity-80 font-weight-normal">View complete vendor bill info</span>
-        </div>
-      </div>
-      <v-btn icon variant="text" color="white" size="small" @click="dialogDetail = false">
-        <XIcon size="18" />
-      </v-btn>
+   <div class="bg-gradient-smooth px-4 py-3 d-flex justify-space-between align-center">
+    <div class="d-flex align-center gap-2">
+     <div class="bg-white rounded-circle pa-1 d-flex">
+      <TagIcon size="16" class="text-primary" />
+     </div>
+     <div>
+      <span class="text-subtitle-1 font-weight-bold text-white d-block" style="line-height: 1.2;">Bill Detail: #{{ detailData.number }}</span>
+      <span class="text-caption text-white opacity-80 font-weight-normal">View complete vendor bill info</span>
+     </div>
     </div>
+    <v-btn icon variant="text" color="white" size="small" @click="dialogDetail = false">
+     <XIcon size="18" />
+    </v-btn>
+   </div>
 
-    <v-card-text class="pa-0 bg-grey-lighten-5 dialog-detail-content" style="max-height: 80vh;">
-      <div class="bg-white pa-4 mb-3 shadow-sm border-bottom">
-        <v-row dense>
-          <v-col cols="12" sm="6" class="py-1">
-            <div class="text-overline text-medium-emphasis mb-0 text-xsmall">Vendor Bill Info</div>
-            <div class="d-flex align-center gap-1 mb-1">
-              <span class="text-h6 font-weight-bold text-primary">{{ detailData.number }}</span>
-            </div>
-            <div class="d-flex align-center gap-1 mb-1 text-grey-darken-1 text-caption">
-              <FileInvoiceIcon size="14" />
-              <span>{{ detailData.transDate }}</span>
-            </div>
-            <div class="d-flex align-center gap-1 text-grey-darken-2 text-caption">
-              <v-chip size="x-small" variant="flat" :color="detailData.status === 'SUBMITTED' ? 'green' : (detailData.status === 'REJECTED' ? 'red' : 'orange')" class="font-weight-bold text-uppercase">
+   <v-card-text class="pa-0 bg-grey-lighten-5 dialog-detail-content" style="max-height: 80vh;">
+    <div class="bg-white pa-4 mb-3 shadow-sm border-bottom">
+     <v-row dense>
+      <v-col cols="12" sm="6" class="py-1">
+       <div class="text-overline text-medium-emphasis mb-0 text-xsmall">Vendor Bill Info</div>
+       <div class="d-flex align-center gap-1 mb-1">
+        <span class="text-h6 font-weight-bold text-primary">{{ detailData.number }}</span>
+       </div>
+       <div class="d-flex align-center gap-1 mb-1 text-grey-darken-1 text-caption">
+        <FileInvoiceIcon size="14" />
+        <span>{{ detailData.transDate }}</span>
+       </div>
+       <div class="d-flex align-center gap-1 text-grey-darken-2 text-caption">
+        <v-chip size="x-small" variant="flat" :color="detailData.status === 'SUBMITTED' ? 'green' : (detailData.status === 'REJECTED' ? 'red' : 'orange')" class="font-weight-bold text-uppercase">
          {{ detailData.status.replace('_', ' ') || 'UNKNOWN' }}
         </v-chip>
-            </div>
-          </v-col>
+       </div>
+      </v-col>
 
-          <v-col cols="12" sm="6" class="text-sm-right py-1">
-            <div class="text-overline text-medium-emphasis mb-0 text-xsmall">Vendor Info</div>
-            <div class="text-subtitle-2 font-weight-bold text-grey-darken-3 mb-1">{{ detailData.vendor.name }}</div>
-            <div class="text-caption text-primary font-mono bg-blue-lighten-5 d-inline-block px-2 py-0 rounded mb-1">
-              {{ detailData.vendor.vendorNo }}
-            </div>
-            <div class="text-xsmall text-grey-darken-1 mt-1 text-left text-sm-right bg-grey-lighten-4 pa-1 rounded border small-note">
-              <span class="font-weight-bold">Note:</span> "{{ detailData.description || 'No description provided' }}"
-            </div>
-          </v-col>
-        </v-row>
-      </div>
+      <v-col cols="12" sm="6" class="text-sm-right py-1">
+       <div class="text-overline text-medium-emphasis mb-0 text-xsmall">Vendor Info</div>
+       <div class="text-subtitle-2 font-weight-bold text-grey-darken-3 mb-1">{{ detailData.vendor.name }}</div>
+       <div class="text-caption text-primary font-mono bg-blue-lighten-5 d-inline-block px-2 py-0 rounded mb-1">
+        {{ detailData.vendor.vendorNo }}
+       </div>
+       <div class="text-xsmall text-grey-darken-1 mt-1 text-left text-sm-right bg-grey-lighten-4 pa-1 rounded border small-note">
+        <span class="font-weight-bold">Note:</span> "{{ detailData.description || 'No description provided' }}"
+       </div>
+      </v-col>
+     </v-row>
+    </div>
 
-      <div class="px-4 pb-4">
-        <div class="text-subtitle-2 font-weight-bold mb-2 d-flex align-center text-primary">
-          <v-icon start color="primary" size="x-small">mdi-package-variant-closed</v-icon>
-          Items Breakdown
-        </div>
-        <v-card variant="outlined" class="border rounded-lg overflow-hidden bg-white">
-          <v-table density="compact" class="compact-detail-table">
-            <thead class="bg-grey-lighten-4">
-              <tr>
-                <th width="200" class="text-caption">Item / Expense</th>
-                <th class="text-center text-caption" width="50">Qty</th>
-                <th class="text-right text-caption" width="100">Price</th>
-                <th class="text-center text-caption" width="70">Disc %</th>
-                <th class="text-center text-caption" width="70">Tax Rate</th>
-                <th class="text-right text-caption" width="120">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, i) in detailData.items" :key="i" class="hover-bg">
-                <td>
-                  <div class="font-weight-medium text-caption">{{ item.itemName }}</div>
-                  <div class="text-xsmall text-medium-emphasis font-mono">{{ item.itemNo }}</div>
-                </td>
-                <td class="text-center text-caption font-weight-bold">{{ item.quantity }}</td>
-                <td class="text-right text-caption">Rp {{ Number(item.unitPrice).toLocaleString('id-ID') }}</td>
-                <td class="text-center text-caption">{{ item.itemDiscPercent || '0' }}%</td>
-                <td class="text-center text-caption">
-                  <span v-if="item.ppnRate > 0" class="text-blue font-weight-bold d-block">PPN ({{ item.ppnRate }}%)</span>
-                  <span v-if="item.pphRate > 0" class="text-red font-weight-bold d-block">PPh ({{ item.pphRate }}%)</span>
-                                    <span v-if="item.ppnRate === 0 && item.pphRate === 0" class="text-grey-darken-1">None</span>
-                </td>
-                <td class="text-right text-caption font-weight-bold">Rp {{ Number(item.lineTotal).toLocaleString('id-ID') }}</td>
-              </tr>
-            </tbody>
-          </v-table>
-        </v-card>
-        
-        <div class="d-flex justify-end mt-4">
-          <v-card variant="outlined" class="pa-2 bg-white" style="width: 300px;">
-            <div class="d-flex justify-space-between text-caption mb-1">
-              <span>Subtotal:</span> <span class="font-weight-bold">Rp {{ Number(detailData.summary.subtotal).toLocaleString('id-ID') }}</span>
-            </div>
-            <div class="d-flex justify-space-between text-caption mb-1">
-              <span>Disc Global ({{ detailData.globalDiscPercent }}%):</span> <span class="font-weight-bold text-red">- Rp {{ (Number(detailData.summary.subtotal) * detailData.globalDiscPercent / 100).toLocaleString('id-ID') }}</span>
-            </div>
-            <div class="d-flex justify-space-between text-caption mb-1">
-              <span>Total PPN:</span> <span class="font-weight-bold text-blue">+ Rp {{ Number(detailData.summary.ppn).toLocaleString('id-ID') }}</span>
-            </div>
-            <div class="d-flex justify-space-between text-caption border-bottom pb-2 mb-2">
-              <span>Total PPh:</span> <span class="font-weight-bold text-green-darken-1">- Rp {{ Number(detailData.summary.pph).toLocaleString('id-ID') }}</span>
-            </div>
-            <div class="d-flex justify-space-between text-subtitle-2 font-weight-bold">
-              <span>Grand Total:</span> <span class="text-primary">Rp {{ Number(detailData.summary.total).toLocaleString('id-ID') }}</span>
-            </div>
-            <div class="d-flex justify-space-between text-caption font-weight-medium my-1">
-              <span>Down Payment:</span> <span>Rp {{ Number(detailData.downPayment).toLocaleString('id-ID') }}</span>
-            </div>
-            <v-divider class="my-2"></v-divider>
-            <div class="d-flex justify-space-between text-subtitle-1 font-weight-bold">
-              <span>Net Balance:</span> <span class="text-red">Rp {{ Number(detailData.summary.net).toLocaleString('id-ID') }}</span>
-            </div>
-          </v-card>
-        </div>
-      </div>
-    </v-card-text>
-    
-    <v-divider></v-divider>
-    
-    <v-card-actions v-if="detailData.status === 'WAITING_APPROVAL' && canApprove" class="bg-white pa-3 justify-end">
-      <v-btn color="error" variant="outlined" size="small" @click="handleReject(detailData.id)" :loading="rejecting" class="px-4 text-caption">
-        <BanIcon size="16" class="mr-1"/> Reject
-      </v-btn>
-      <v-btn color="success" variant="flat" size="small" @click="handleApprove(detailData.id)" :loading="approving" class="px-4 text-caption">
-        <CheckIcon size="16" class="mr-1"/> Approve & Send
-      </v-btn>
-    </v-card-actions>
-    <v-card-actions v-else class="bg-white pa-3 justify-end">
+    <div class="px-4 pb-4">
+     <div class="text-subtitle-2 font-weight-bold mb-2 d-flex align-center text-primary">
+      <v-icon start color="primary" size="x-small">mdi-package-variant-closed</v-icon>
+      Items Breakdown
+     </div>
+     <v-card variant="outlined" class="border rounded-lg overflow-hidden bg-white">
+      <v-table density="compact" class="compact-detail-table">
+       <thead class="bg-grey-lighten-4">
+        <tr>
+         <th width="200" class="text-caption">Item / Expense</th>
+         <th class="text-center text-caption" width="50">Qty</th>
+         <th class="text-right text-caption" width="100">Price</th>
+         <th class="text-center text-caption" width="70">Disc %</th>
+         <th class="text-center text-caption" width="70">Tax Rate</th>
+         <th class="text-right text-caption" width="120">Total</th>
+        </tr>
+       </thead>
+       <tbody>
+        <tr v-for="(item, i) in detailData.items" :key="i" class="hover-bg">
+         <td>
+          <div class="font-weight-medium text-caption">{{ item.itemName }}</div>
+          <div class="text-xsmall text-medium-emphasis font-mono">{{ item.itemNo }}</div>
+         </td>
+         <td class="text-center text-caption font-weight-bold">{{ item.quantity }}</td>
+         <td class="text-right text-caption">Rp {{ Number(item.unitPrice).toLocaleString('id-ID') }}</td>
+         <td class="text-center text-caption">{{ item.itemDiscPercent || '0' }}%</td>
+         <td class="text-center text-caption">
+          <span v-if="item.ppnRate > 0" class="text-blue font-weight-bold d-block">PPN ({{ item.ppnRate }}%)</span>
+          <span v-if="item.pphRate > 0" class="text-red font-weight-bold d-block">PPh ({{ item.pphRate }}%)</span>
+                  <span v-if="item.ppnRate === 0 && item.pphRate === 0" class="text-grey-darken-1">None</span>
+         </td>
+         <td class="text-right text-caption font-weight-bold">Rp {{ Number(item.lineTotal).toLocaleString('id-ID') }}</td>
+        </tr>
+       </tbody>
+      </v-table>
+     </v-card>
+     
+     <div class="d-flex justify-end mt-4">
+      <v-card variant="outlined" class="pa-2 bg-white" style="width: 300px;">
+       <div class="d-flex justify-space-between text-caption mb-1">
+        <span>Subtotal:</span> <span class="font-weight-bold">Rp {{ Number(detailData.summary.subtotal).toLocaleString('id-ID') }}</span>
+       </div>
+       <div class="d-flex justify-space-between text-caption mb-1">
+        <span>Disc Global ({{ detailData.globalDiscPercent }}%):</span> <span class="font-weight-bold text-red">- Rp {{ (Number(detailData.summary.subtotal) * detailData.globalDiscPercent / 100).toLocaleString('id-ID') }}</span>
+       </div>
+       <div class="d-flex justify-space-between text-caption mb-1">
+        <span>Total PPN:</span> <span class="font-weight-bold text-blue">+ Rp {{ Number(detailData.summary.ppn).toLocaleString('id-ID') }}</span>
+       </div>
+       <div class="d-flex justify-space-between text-caption border-bottom pb-2 mb-2">
+        <span>Total PPh:</span> <span class="font-weight-bold text-green-darken-1">- Rp {{ Number(detailData.summary.pph).toLocaleString('id-ID') }}</span>
+       </div>
+       <div class="d-flex justify-space-between text-subtitle-2 font-weight-bold">
+        <span>Grand Total:</span> <span class="text-primary">Rp {{ Number(detailData.summary.total).toLocaleString('id-ID') }}</span>
+       </div>
+       <div class="d-flex justify-space-between text-caption font-weight-medium my-1">
+        <span>Down Payment:</span> <span>Rp {{ Number(detailData.downPayment).toLocaleString('id-ID') }}</span>
+       </div>
+       <v-divider class="my-2"></v-divider>
+       <div class="d-flex justify-space-between text-subtitle-1 font-weight-bold">
+        <span>Net Balance:</span> <span class="text-red">Rp {{ Number(detailData.summary.net).toLocaleString('id-ID') }}</span>
+       </div>
+      </v-card>
+     </div>
+    </div>
+   </v-card-text>
+   
+   <v-divider></v-divider>
+   
+   <v-card-actions v-if="detailData.status === 'WAITING_APPROVAL' && canApprove" class="bg-white pa-3 justify-end">
+    <v-btn color="error" variant="outlined" size="small" @click="handleReject(detailData.id)" :loading="rejecting" class="px-4 text-caption">
+     <BanIcon size="16" class="mr-1"/> Reject
+    </v-btn>
+    <v-btn color="success" variant="flat" size="small" @click="handleApprove(detailData.id)" :loading="approving" class="px-4 text-caption">
+     <CheckIcon size="16" class="mr-1"/> Approve & Send
+    </v-btn>
+   </v-card-actions>
+   <v-card-actions v-else class="bg-white pa-3 justify-end">
    <v-btn variant="outlined" color="primary" size="small" @click="dialogDetail = false" class="px-4 text-caption">Close Detail</v-btn>
   </v-card-actions>
   </v-card>
@@ -763,6 +984,17 @@ fetchList();
 }
 .small-note {
  padding: 4px !important;
+}
+.hover-row {
+    cursor: pointer;
+}
+.hover-row:hover {
+    background-color: #e3f2fd !important;
+}
+.item-name-link {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dashed;
 }
 
 /* INPUT COMPACT STYLING (Re-use dari InvoicePage) */
