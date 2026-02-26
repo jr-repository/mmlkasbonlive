@@ -18,6 +18,7 @@ const sidebarMenu = shallowRef(sidebarItems);
 // Value sebelah KANAN harus sama persis dengan 'key' di UserSettingPage.vue
 const menuKeyMap: Record<string, string> = {
     'Dashboard': 'dashboard',
+    'Proyek': 'proyek',
     'Job Order': 'job_order',
     'Sales Invoice (AR)': 'invoice', 
     'Tagihan Vendor (AP)': 'bill',   
@@ -27,7 +28,7 @@ const menuKeyMap: Record<string, string> = {
     'Laporan': 'laporan',
     'Aktivitas User': 'laporan', 
     'Rekonsiliasi Bank': 'rekon',    
-    'Setting Pajak': 'master_tax',    
+    'Setting Pajak': 'master_tax',   
     'Manajemen User': 'users',
     'Setting Approver': 'approver_settings', 
     'Konfigurasi Sistem': 'settings',

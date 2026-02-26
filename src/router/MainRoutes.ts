@@ -11,6 +11,13 @@ const MainRoutes = {
             path: '/',
             component: () => import('@/views/akuntansi/DashboardPage.vue')
         },
+        // --- MODUL BARU: PROYEK ---
+        {
+            name: 'Proyek',
+            path: '/proyek',
+            component: () => import('@/views/akuntansi/ProyekPage.vue')
+        },
+        // --------------------------
         {
             name: 'JobOrder',
             path: '/job-order',

@@ -40,6 +40,7 @@ const fetchProfileMinimal = async () => {
 
 const routeNames: Record<string, string> = {
     'Dashboard': 'Dashboard',
+    'Proyek': 'Proyek',
     'JobOrder': 'Job Order',
     'Kasbon': 'Kasbon & Biaya',
     'Invoice': 'Sales Invoice',

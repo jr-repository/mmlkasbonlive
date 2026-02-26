@@ -3,8 +3,6 @@ import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { format } from 'date-fns';
 import { useAuthStore } from '@/stores/auth';
 import UiParentCard from '@/components/shared/UiParentCard.vue';
-// HAPUS AsyncSelect KARENA KITA GANTI DENGAN V-AUTOCOMPLETE
-// import AsyncSelect from '@/components/common/AsyncSelect.vue';
 import { 
  PlusIcon, TrashIcon, EyeIcon, DeviceFloppyIcon, XIcon, WalletIcon,
  CheckIcon, BanIcon, PencilIcon, SearchIcon, FileInvoiceIcon, ListCheckIcon, FormsIcon, ClockIcon 
@@ -30,6 +28,9 @@ const loadingCustomers = ref(false);
 const itemList = ref<any[]>([]);
 const loadingItems = ref(false);
 
+const projectList = ref<any[]>([]);
+const loadingProjects = ref(false);
+
 // --- FORM STATE ---
 const form = reactive({
  id: 0, 
@@ -49,7 +50,8 @@ const form = reactive({
    unitPrice: 0, 
    itemDiscPercent: '', 
    ppnRate: 0, 
-   pphRate: 0
+   pphRate: 0,
+   projectNo: ''
   }
  ]
 });
@@ -67,6 +69,7 @@ const itemDetailForm = reactive({
  itemDiscPercent: '', 
  ppnRate: 0, 
  pphRate: 0,
+ projectNo: '',
  asyncSelectValue: null as any 
 });
 
@@ -141,12 +144,10 @@ const netBalance = computed(() => grandTotal.value - form.downPayment);
 const filteredInvoiceList = computed(() => {
   let list = invoiceList.value;
 
-  // 1. Filter Status
   if(filterStatus.value !== 'ALL') {
     list = list.filter(item => item.status === filterStatus.value || (filterStatus.value === 'SUBMITTED' && item.status === 'WAITING_PAYMENT'));
   }
 
-  // 2. Filter Search (Client Side)
   if (search.value) {
     const query = search.value.toLowerCase();
     list = list.filter(item => 
@@ -171,7 +172,6 @@ const fetchCustomers = async () => {
       customerList.value = json.d;
     }
   } catch (e) {
-    // Silent fail or log
   } finally {
     loadingCustomers.value = false;
   }
@@ -186,9 +186,22 @@ const fetchItems = async () => {
       itemList.value = json.d;
     }
   } catch (e) {
-    // Silent fail or log
   } finally {
     loadingItems.value = false;
+  }
+};
+
+const fetchProjects = async () => {
+  loadingProjects.value = true;
+  try {
+    const res = await fetch(`${API_BASE_URL}/Project/List.php`);
+    const json = await res.json();
+    if (json.s && Array.isArray(json.d)) {
+      projectList.value = json.d;
+    }
+  } catch (e) {
+  } finally {
+    loadingProjects.value = false;
   }
 };
 
@@ -210,7 +223,6 @@ const fetchList = async () => {
  loadingList.value = true;
  try {
   const url = new URL(`${API_BASE_URL}/Invoice/List.php`);
-  // Kita hapus append 'q' agar data diambil semua, lalu difilter di computed
   const res = await fetch(url.toString());
   const json = await res.json();
   if(json.s) invoiceList.value = json.d.map((x:any, i:number) => ({
@@ -225,7 +237,7 @@ const fetchList = async () => {
 const addItem = () => {
  form.items.push({ 
   id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', 
-  ppnRate: getDefaultTax('PPN'), pphRate: getDefaultTax('PPH') 
+  ppnRate: getDefaultTax('PPN'), pphRate: getDefaultTax('PPH'), projectNo: ''
  });
  openItemDetailModal(form.items[form.items.length - 1], form.items.length - 1);
 };
@@ -234,7 +246,6 @@ const removeItem = (idx: number) => {
  if(form.items.length > 1) form.items.splice(idx, 1);
 };
 
-// Handler saat Customer dipilih dari v-autocomplete
 const onCustChange = (val: any) => {
   const selected = customerList.value.find(c => c.customerNo === val);
   if (selected) {
@@ -243,7 +254,6 @@ const onCustChange = (val: any) => {
   }
 };
 
-// Handler saat Item dipilih dari v-autocomplete (di modal detail item)
 const onItemChange = (val: any) => {
   const selected = itemList.value.find(i => i.no === val);
   if (selected) {
@@ -260,7 +270,7 @@ const resetForm = () => {
  form.customerNo = ''; 
  form.customerName = '';
  form.description = '';
- form.items = [{ id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', ppnRate: getDefaultTax('PPN'), pphRate: getDefaultTax('PPH') }];
+ form.items = [{ id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', ppnRate: getDefaultTax('PPN'), pphRate: getDefaultTax('PPH'), projectNo: '' }];
  form.downPayment = 0; 
  form.globalDiscPercent = 0;
  isEditing.value = false;
@@ -288,7 +298,8 @@ const handleEdit = async (item: any) => {
    unitPrice: x.unitPrice,
    itemDiscPercent: x.itemDiscPercent,
    ppnRate: x.ppnRate || getDefaultTax('PPN'), 
-   pphRate: x.pphRate || getDefaultTax('PPH')
+   pphRate: x.pphRate || getDefaultTax('PPH'),
+   projectNo: x.projectNo || ''
   }));
   
   isEditing.value = true;
@@ -370,7 +381,6 @@ const openDetail = async (id: number) => {
  if(json.s) {
     const d = json.d;
     detailData.value = d;
-    // Inisiasi form payment saat membuka detail (walaupun modalnya belum dibuka)
     paymentForm.invoiceId = d.id;
     paymentForm.paidAmount = d.summary.net;
     paymentForm.paidDate = format(new Date(), 'yyyy-MM-dd');
@@ -438,6 +448,7 @@ const openItemDetailModal = (item: any, index: number) => {
  itemDetailForm.itemDiscPercent = item.itemDiscPercent;
  itemDetailForm.ppnRate = item.ppnRate;
  itemDetailForm.pphRate = item.pphRate;
+ itemDetailForm.projectNo = item.projectNo || '';
  itemDetailForm.asyncSelectValue = item.itemNo;
  dialogItemDetail.value = true;
 };
@@ -456,6 +467,7 @@ const saveItemDetail = () => {
   form.items[index].itemDiscPercent = String(itemDetailForm.itemDiscPercent);
   form.items[index].ppnRate = Number(itemDetailForm.ppnRate);
   form.items[index].pphRate = Number(itemDetailForm.pphRate);
+  form.items[index].projectNo = itemDetailForm.projectNo;
  }
  dialogItemDetail.value = false;
  editingItemIndex.value = -1;
@@ -463,16 +475,15 @@ const saveItemDetail = () => {
 
 // --- HOOKS ---
 onMounted(() => {
- // Load Data Master Sekali Saja
  fetchCustomers();
  fetchItems();
+ fetchProjects();
  fetchTaxes().then(() => {
   if(form.items.length > 0) {
    form.items[0].ppnRate = getDefaultTax('PPN');
    form.items[0].pphRate = getDefaultTax('PPH');
   }
  });
- // Load List Transaksi
  fetchList(); 
 });
 </script>
@@ -722,7 +733,10 @@ onMounted(() => {
             <tr v-for="(item, i) in form.items" :key="item.id" class="hover-row">
              <td class="py-1 item-cell" @click="openItemDetailModal(item, i)">
               <div class="text-primary font-weight-bold text-caption item-name-link">{{ item.itemName || 'Click to Select Item' }}</div>
-              <div class="text-xsmall text-medium-emphasis font-mono">{{ item.itemNo }}</div>
+              <div class="text-xsmall text-medium-emphasis font-mono">
+                  {{ item.itemNo }} 
+                  <span v-if="item.projectNo" class="text-blue ml-1 font-weight-bold">| PRJ: {{ item.projectNo }}</span>
+              </div>
              </td>
              <td class="align-top py-1 text-center text-caption font-weight-medium">
               {{ item.quantity.toLocaleString() }}
@@ -878,7 +892,7 @@ onMounted(() => {
    
    <v-card-text class="pa-4 bg-grey-lighten-5 dialog-detail-content">
     
-        <v-row no-gutters class="mb-3">
+    <v-row no-gutters class="mb-3">
      <div class="text-caption font-weight-bold mb-1 d-block text-primary">Item / Service</div>
      <v-autocomplete 
       label="Select Item" 
@@ -896,7 +910,25 @@ onMounted(() => {
      />
     </v-row>
 
-        <v-row no-gutters class="d-flex gap-4">
+    <v-row no-gutters class="mb-3">
+     <div class="text-caption font-weight-bold mb-1 d-block text-primary">Project (Optional)</div>
+     <v-autocomplete 
+      label="Select Project" 
+      :items="projectList"
+      item-title="name" 
+      item-value="no"
+      v-model="itemDetailForm.projectNo"
+      :loading="loadingProjects"
+      density="compact"
+      hide-details
+      clearable
+      variant="outlined"
+      class="small-input"
+      placeholder="Search project..."
+     />
+    </v-row>
+
+    <v-row no-gutters class="d-flex gap-4">
      <div style="flex-grow: 1;">
       <div class="text-caption font-weight-bold mb-1 d-block text-primary">Quantity</div>
       <v-text-field 
@@ -937,7 +969,7 @@ onMounted(() => {
      </div>
     </v-row>
 
-        <v-row no-gutters class="mt-4 d-flex gap-4">
+    <v-row no-gutters class="mt-4 d-flex gap-4">
      <div style="flex-grow: 1;">
       <div class="text-caption font-weight-bold mb-1 d-block text-primary">PPN Rate</div>
       <v-select 
@@ -1047,7 +1079,10 @@ onMounted(() => {
         <tr v-for="(item, i) in detailData.items" :key="i" class="hover-bg">
          <td>
           <div class="font-weight-medium text-caption">{{ item.itemName }}</div>
-          <div class="text-xsmall text-medium-emphasis font-mono">{{ item.itemNo }}</div>
+          <div class="text-xsmall text-medium-emphasis font-mono">
+              {{ item.itemNo }}
+              <span v-if="item.projectNo" class="text-blue ml-1 font-weight-bold">| PRJ: {{ item.projectNo }}</span>
+          </div>
          </td>
          <td class="text-center text-caption font-weight-bold">{{ item.quantity }}</td>
          <td class="text-right text-caption">Rp {{ Number(item.unitPrice).toLocaleString() }}</td>

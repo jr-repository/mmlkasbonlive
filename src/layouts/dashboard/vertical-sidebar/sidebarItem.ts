@@ -12,7 +12,8 @@ import {
     ActivityIcon,
     UserCircleIcon,
     CashIcon,   // Icon untuk Modul Payroll
-    CircleIcon  // Icon untuk Submenu
+    CircleIcon,  // Icon untuk Submenu
+    BriefcaseIcon // Icon untuk Menu Proyek
 } from 'vue-tabler-icons';
 
 export interface menu {
@@ -42,6 +43,11 @@ const sidebarItem: menu[] = [
 
     // --- Kategori: Transaksi Operasional & Keuangan ---
     { header: 'Transaksi' },
+    {
+        title: 'Proyek',
+        icon: BriefcaseIcon,
+        to: '/proyek'
+    },
     {
         title: 'Job Order',
         icon: ClipboardListIcon,
