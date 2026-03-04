@@ -21,26 +21,134 @@ const invoiceList = ref<any[]>([]); // Menyimpan seluruh data invoice
 const search = ref(''); // Input pencarian untuk list invoice
 const taxList = ref<any[]>([]); 
 
+// --- OPSI PAJAK ACCURATE ---
+const docCodeOptions = [
+  { value: 'CTAS_INVOICE', title: 'Faktur Pajak' },
+  { value: 'CTAS_DELIVERY', title: 'Dokumen Tertentu' },
+  { value: 'CTAS_EXPORT', title: 'Ekspor' },
+  { value: 'INVOICE', title: 'Legacy - Faktur Pajak' },
+  { value: 'DOCUMENT', title: 'Legacy - Dokumen Dipersamakan FP' },
+  { value: 'EXPORT', title: 'Legacy - Dokumen Ekspor (PEB)' },
+  { value: 'DIGUNGGUNG', title: 'Digunggung' }
+];
+
+const taxTypeOptions = [
+  { value: 'CTAS_KEPADA_SELAIN_PEMUNGUT_PPN', title: '01 - kepada selain Pemungut PPN' },
+  { value: 'CTAS_KEPADA_PEMUNGUT_PPN_INSTANSI_PEMERINTAH', title: '02 - kepada Pemungut PPN Instansi Pemerintah' },
+  { value: 'CTAS_KEPADA_PEMUNGUT_PPN_SELAIN_INSTANSI_PEMERINTAH', title: '03 - kepada Pemungut PPN selain Instansi Pemerintah' },
+  { value: 'CTAS_DPP_NILAI_LAIN', title: '04 - DPP Nilai Lain' },
+  { value: 'CTAS_BESARAN_TERTENTU', title: '05 - Besaran tertentu' },
+  { value: 'CTAS_KEPADA_ORANG_PRIBADI_PEMEGANG_PASPOR_LUAR_NEGERI', title: '06 - kepada orang pribadi pemegang paspor luar negeri' },
+  { value: 'CTAS_PENYERAHAN_DENGAN_FASILITAS_TIDAK_DIPUNGUT', title: '07 - penyerahan dengan fasilitas PPN tidak dipungut' },
+  { value: 'CTAS_PENYERAHAN_DENGAN_FASILITAS_DIBEBASKAN', title: '08 - penyerahan dengan fasilitas dibebaskan PPN' },
+  { value: 'CTAS_PENYERAHAN_AKTIVA_TIDAK_DIPERJUALBELIKAN', title: '09 - penyerahan aktiva (16D UU PPN)' },
+  { value: 'CTAS_PENYERAHAN_LAINNYA', title: '10 - Penyerahan lainnya' },
+  { value: 'CTAS_EKSPOR_BARANG_BERWUJUD', title: '01 - Ekspor Barang Berwujud' },
+  { value: 'CTAS_EKSPOR_BARANG_TIDAK_BERWUJUD', title: '02 - Ekspor Barang Tidak Berwujud' },
+  { value: 'CTAS_EKSPOR_JASA', title: '03 - Ekspor Jasa' }
+];
+
+const docTransOptions = [
+  { value: 'CTAS_DIPERSAMAKAN', title: 'Dokumen yang setara dengan faktur pajak' },
+  { value: 'CTAS_EKSPOR_BARANG', title: 'Pemberitahuan Ekspor Barang' },
+  { value: 'CTAS_EKSPOR_DOKUMEN', title: 'Dokumen Kawasan Berikat' },
+  { value: 'CTAS_PEMBERITAHUAN_EKSPOR_TIDAK_BERWUJUD', title: 'Pemberitahuan Ekspor Jasa/Barang Tidak Berwujud' },
+  { value: 'CTAS_CUKAI_ROKO', title: 'Cukai Rokok' }
+];
+
+const wpTypeOptions = [
+  { value: 'AUTO', title: 'Auto' },
+  { value: 'NIK', title: 'NIK' },
+  { value: 'NPWP', title: 'NPWP' },
+  { value: 'OTHER', title: 'Lainnya' },
+  { value: 'PASSPORT', title: 'Passport' }
+];
+
 // --- STATE UNTUK DROPDOWN (SEARCH LOKAL FORM) ---
 const customerList = ref<any[]>([]);
 const loadingCustomers = ref(false);
 
 const itemList = ref<any[]>([]);
 const loadingItems = ref(false);
+const searchItemText = ref('');
 
 const projectList = ref<any[]>([]);
 const loadingProjects = ref(false);
+const searchProjectText = ref('');
+
+const shipmentList = ref<any[]>([]);
+
+// LOGIKA FILTER AGAR DROPDOWN TIDAK LAG (Max 50 Item)
+const filteredItems = computed(() => {
+  let result = itemList.value;
+  if (searchItemText.value) {
+    const q = searchItemText.value.toLowerCase();
+    result = result.filter(i => 
+      (i.name && i.name.toLowerCase().includes(q)) || 
+      (i.no && i.no.toLowerCase().includes(q))
+    );
+  }
+  const sliced = result.slice(0, 50);
+  if (itemDetailForm.itemNo && !sliced.some(i => i.no === itemDetailForm.itemNo)) {
+    const selected = itemList.value.find(i => i.no === itemDetailForm.itemNo);
+    if (selected) sliced.push(selected);
+  }
+  return sliced;
+});
+
+const filteredProjects = computed(() => {
+  let result = projectList.value;
+  if (searchProjectText.value) {
+    const q = searchProjectText.value.toLowerCase();
+    result = result.filter(i => 
+      (i.name && i.name.toLowerCase().includes(q)) || 
+      (i.no && i.no.toLowerCase().includes(q))
+    );
+  }
+  const sliced = result.slice(0, 50);
+  if (itemDetailForm.projectNo && !sliced.some(i => i.no === itemDetailForm.projectNo)) {
+    const selected = projectList.value.find(i => i.no === itemDetailForm.projectNo);
+    if (selected) sliced.push(selected);
+  }
+  return sliced;
+});
+const loadingShipments = ref(false);
+
+const fobList = ref<any[]>([]);
+const loadingFobs = ref(false);
 
 // --- FORM STATE ---
 const form = reactive({
  id: 0, 
  transDate: format(new Date(), 'yyyy-MM-dd'),
  dueDate: format(new Date(), 'yyyy-MM-dd'), 
+ taxable: false,
+ inclusiveTax: false,
+ taxDate: format(new Date(), 'yyyy-MM-dd'),
+ documentCode: 'CTAS_INVOICE',
+ taxType: 'CTAS_KEPADA_SELAIN_PEMUNGUT_PPN',
+ documentTransaction: 'CTAS_DIPERSAMAKAN',
+ wpType: 'AUTO',
+ wpNumber: '',
+ wpName: '',
+ idTku: '',
+ taxNumber: '',
+ shipDate: format(new Date(), 'yyyy-MM-dd'),
+ shipmentName: '',
+ fobName: '', 
  customerNo: '',
  customerName: '',
  description: '',
  globalDiscPercent: 0,
  downPayment: 0,
+ charField1: '',
+ charField2: '',
+ charField3: '',
+ charField4: '',
+ charField5: '',
+ charField6: '',
+ charField7: '',
+ charField8: '',
  items: [
   { 
    id: Date.now(), 
@@ -123,7 +231,7 @@ const totalPPN = computed(() => {
   let net = price - (price * discVal/100);
   tot += (net * (Number(item.ppnRate)/100));
  });
- return tot * (1 - (form.globalDiscPercent/100));
+ return Math.round(tot * (1 - (form.globalDiscPercent/100)));
 });
 
 const totalPPh = computed(() => {
@@ -134,11 +242,13 @@ const totalPPh = computed(() => {
   let net = price - (price * discVal/100);
   tot += (net * (Number(item.pphRate)/100));
  });
- return tot * (1 - (form.globalDiscPercent/100));
+ return Math.round(tot * (1 - (form.globalDiscPercent/100)));
 });
 
-const grandTotal = computed(() => taxableAmount.value + totalPPN.value - totalPPh.value); 
-const netBalance = computed(() => grandTotal.value - form.downPayment);
+// Grand total sesuai Accurate (Tanpa dipotong PPh)
+const grandTotal = computed(() => taxableAmount.value + totalPPN.value); 
+// Net Balance = Grand Total dipotong PPh dan DP (Sisa murni yang harus ditransfer)
+const netBalance = computed(() => grandTotal.value - totalPPh.value - form.downPayment);
 
 // --- LOGIKA FILTERING LIST INVOICE (CLIENT SIDE) ---
 const filteredInvoiceList = computed(() => {
@@ -205,6 +315,24 @@ const fetchProjects = async () => {
   }
 };
 
+const fetchShipments = async () => {
+  loadingShipments.value = true;
+  try {
+    const res = await fetch(`${API_BASE_URL}/Invoice/MasterShipment.php`);
+    const json = await res.json();
+    if (json.s && Array.isArray(json.d)) shipmentList.value = json.d;
+  } catch (e) {} finally { loadingShipments.value = false; }
+};
+
+const fetchFobs = async () => {
+  loadingFobs.value = true;
+  try {
+    const res = await fetch(`${API_BASE_URL}/Invoice/MasterFOB.php`);
+    const json = await res.json();
+    if (json.s && Array.isArray(json.d)) fobList.value = json.d;
+  } catch (e) {} finally { loadingFobs.value = false; }
+};
+
 const fetchTaxes = async () => {
  try {
   const res = await fetch(`${API_BASE_URL}/MasterData/Tax/List.php`);
@@ -226,10 +354,10 @@ const fetchList = async () => {
   const res = await fetch(url.toString());
   const json = await res.json();
   if(json.s) invoiceList.value = json.d.map((x:any, i:number) => ({
-    ...x, 
-    index: i+1,
-    dueDate: x.dueDate,
-    agingDays: x.agingDays
+   ...x, 
+   index: i+1,
+   dueDate: x.dueDate,
+   agingDays: x.agingDays
   }));
  } finally { loadingList.value = false; }
 };
@@ -251,8 +379,31 @@ const onCustChange = (val: any) => {
   if (selected) {
     form.customerNo = selected.customerNo;
     form.customerName = selected.name;
+    
+    if(form.wpType === 'AUTO') {
+      form.wpNumber = selected.npwpNo || '';
+      form.wpName = selected.wpName || selected.name || '';
+      form.idTku = selected.nitku || '';
+    }
   }
 };
+
+// Deteksi perubahan tipe wajib pajak untuk auto-fill jika pindah ke AUTO
+watch(() => form.wpType, (newVal) => {
+  if (newVal === 'AUTO' && form.customerNo) {
+    const selected = customerList.value.find(c => c.customerNo === form.customerNo);
+    if (selected) {
+      form.wpNumber = selected.npwpNo || '';
+      form.wpName = selected.wpName || selected.name || '';
+      form.idTku = selected.nitku || '';
+    }
+  } else if (newVal !== 'AUTO') {
+     // Kosongkan agar bisa diisi manual, atau biarkan tetap ada untuk diedit
+     form.wpNumber = '';
+     form.wpName = '';
+     form.idTku = '';
+  }
+});
 
 const onItemChange = (val: any) => {
   const selected = itemList.value.find(i => i.no === val);
@@ -270,6 +421,28 @@ const resetForm = () => {
  form.customerNo = ''; 
  form.customerName = '';
  form.description = '';
+ form.charField1 = '';
+ form.charField2 = '';
+ form.charField3 = '';
+ form.charField4 = '';
+ form.charField5 = '';
+ form.charField6 = '';
+ form.charField7 = '';
+ form.charField8 = '';
+ form.taxable = false;
+ form.inclusiveTax = false;
+ form.taxDate = format(new Date(), 'yyyy-MM-dd');
+ form.documentCode = 'CTAS_INVOICE';
+ form.taxType = 'CTAS_KEPADA_SELAIN_PEMUNGUT_PPN';
+ form.documentTransaction = 'CTAS_DIPERSAMAKAN';
+ form.wpType = 'AUTO';
+ form.wpNumber = '';
+ form.wpName = '';
+ form.idTku = '';
+ form.taxNumber = '';
+ form.shipDate = format(new Date(), 'yyyy-MM-dd');
+ form.shipmentName = '';
+ form.fobName = '';
  form.items = [{ id: Date.now(), itemNo: '', itemName: '', quantity: 1, unitPrice: 0, itemDiscPercent: '', ppnRate: getDefaultTax('PPN'), pphRate: getDefaultTax('PPH'), projectNo: '' }];
  form.downPayment = 0; 
  form.globalDiscPercent = 0;
@@ -289,6 +462,31 @@ const handleEdit = async (item: any) => {
   form.description = d.description;
   form.globalDiscPercent = d.globalDiscPercent;
   form.downPayment = d.downPayment;
+
+  form.charField1 = d.infoTambahan?.charField1 || '';
+  form.charField2 = d.infoTambahan?.charField2 || '';
+  form.charField3 = d.infoTambahan?.charField3 || '';
+  form.charField4 = d.infoTambahan?.charField4 || '';
+  form.charField5 = d.infoTambahan?.charField5 || '';
+  form.charField6 = d.infoTambahan?.charField6 || '';
+  form.charField7 = d.infoTambahan?.charField7 || '';
+  form.charField8 = d.infoTambahan?.charField8 || '';
+
+  form.taxable = d.infoPajak?.taxable || false;
+  form.inclusiveTax = d.infoPajak?.inclusiveTax || false;
+  form.taxDate = d.infoPajak?.taxDate || form.transDate;
+  form.documentCode = d.infoPajak?.documentCode || 'CTAS_INVOICE';
+  form.taxType = d.infoPajak?.taxType || 'CTAS_KEPADA_SELAIN_PEMUNGUT_PPN';
+  form.documentTransaction = d.infoPajak?.documentTransaction || 'CTAS_DIPERSAMAKAN';
+  form.wpType = d.infoPajak?.wpType || 'AUTO';
+  form.wpNumber = d.infoPajak?.wpNumber || '';
+  form.wpName = d.infoPajak?.wpName || '';
+  form.idTku = d.infoPajak?.idTku || '';
+  form.taxNumber = d.infoPajak?.taxNumber || '';
+
+  form.shipDate = d.infoPengiriman?.shipDate || form.transDate;
+  form.shipmentName = d.infoPengiriman?.shipmentName || '';
+  form.fobName = d.infoPengiriman?.fobName || '';
   
   form.items = d.items.map((x:any) => ({
    id: Date.now() + Math.random(),
@@ -371,6 +569,10 @@ const handleReject = async (id: number) => {
   }
  } catch { showMsg("Error koneksi", "error"); }
  finally { rejecting.value = false; }
+};
+
+const downloadPdf = (id: number) => {
+ window.open(`${API_BASE_URL}/Invoice/ExportPdf.php?id=${id}`, '_blank');
 };
 
 const openDetail = async (id: number) => {
@@ -478,6 +680,8 @@ onMounted(() => {
  fetchCustomers();
  fetchItems();
  fetchProjects();
+ fetchShipments();
+ fetchFobs();
  fetchTaxes().then(() => {
   if(form.items.length > 0) {
    form.items[0].ppnRate = getDefaultTax('PPN');
@@ -579,12 +783,12 @@ onMounted(() => {
         :loading="loadingList" 
         density="compact"
         hover
-        class="rounded-0 compact-data-table"
+        class="rounded-0 compact-data-table table-nowrap"
        >
         <template v-slot:headers="{ columns }">
          <tr class="bg-gradient-smooth">
          <template v-for="column in columns" :key="column.key ?? column.title">
-           <th class="text-caption font-weight-bold text-uppercase text-white py-2 border-none" :class="`text-${column.align}`">
+           <th class="font-weight-bold text-capitalize text-white py-2 border-none" :class="`text-${column.align}`">
             {{ column.title }}
            </th>
           </template>
@@ -622,10 +826,11 @@ onMounted(() => {
          <v-chip 
           size="x-small" 
           variant="tonal"
-          class="font-weight-bold text-uppercase text-caption"
+          class="font-weight-bold text-capitalize"
+          style="font-size: 0.65rem;"
           :color="item.status === 'SUBMITTED' ? 'orange' : (item.status === 'REJECTED' ? 'red' : (item.status === 'PAID' ? 'green' : (item.status === 'WAITING_APPROVAL' ? 'blue' : 'grey')))"
          >
-          {{ item.status === 'SUBMITTED' ? 'WAITING PAYMENT' : item.status.replace('_', ' ') }}
+          {{ item.status === 'SUBMITTED' ? 'Waiting Payment' : item.status.replace('_', ' ').toLowerCase() }}
          </v-chip>
         </template>
         
@@ -713,6 +918,87 @@ onMounted(() => {
           hide-details
           class="small-input small-textarea"
          ></v-textarea>
+
+         <h6 class="text-subtitle-2 font-weight-bold mb-2 mt-4 text-primary">Info Pajak</h6>
+         <div class="d-flex gap-4 mb-2">
+           <v-checkbox v-model="form.taxable" label="Kena Pajak" density="compact" hide-details color="primary" class="text-caption"></v-checkbox>
+           <v-checkbox v-model="form.inclusiveTax" label="Total termasuk Pajak" density="compact" hide-details color="primary" class="text-caption"></v-checkbox>
+         </div>
+         
+         <v-row dense v-if="form.taxable" class="bg-blue-lighten-5 pa-2 rounded border mb-2 mx-0">
+           <v-col cols="12" class="py-1">
+             <v-text-field type="date" label="Tgl Faktur Pajak" v-model="form.taxDate" variant="outlined" density="compact" hide-details class="small-input bg-white"></v-text-field>
+           </v-col>
+           <v-col cols="12" class="py-1">
+             <v-autocomplete label="Tipe Transaksi" :items="docCodeOptions" v-model="form.documentCode" variant="outlined" density="compact" hide-details class="small-input bg-white"></v-autocomplete>
+           </v-col>
+           <v-col cols="12" class="py-1">
+             <v-autocomplete label="Detail Transaksi" :items="taxTypeOptions" v-model="form.taxType" variant="outlined" density="compact" hide-details class="small-input bg-white"></v-autocomplete>
+           </v-col>
+           <v-col cols="12" class="py-1">
+             <v-autocomplete label="Transaksi Dokumen" :items="docTransOptions" v-model="form.documentTransaction" variant="outlined" density="compact" hide-details class="small-input bg-white"></v-autocomplete>
+           </v-col>
+           <v-col cols="12" sm="4" class="py-1">
+             <v-select label="Data Wajib Pajak" :items="wpTypeOptions" v-model="form.wpType" variant="outlined" density="compact" hide-details class="small-input bg-white"></v-select>
+           </v-col>
+           <v-col cols="12" sm="8" class="py-1">
+             <v-text-field label="No NPWP / NIK" v-model="form.wpNumber" :disabled="form.wpType === 'AUTO'" variant="outlined" density="compact" hide-details class="small-input bg-white" placeholder="Sesuai tipe WP"></v-text-field>
+           </v-col>
+           
+           <v-col cols="12" sm="4" class="py-0 d-none d-sm-flex"></v-col>
+           <v-col cols="12" sm="8" class="py-1">
+             <v-text-field label="Nama Wajib Pajak" v-model="form.wpName" :disabled="form.wpType === 'AUTO'" variant="outlined" density="compact" hide-details class="small-input bg-white"></v-text-field>
+           </v-col>
+
+           <v-col cols="12" class="py-1">
+             <v-text-field label="ID TKU" v-model="form.idTku" :disabled="form.wpType === 'AUTO'" variant="outlined" density="compact" hide-details class="small-input bg-white"></v-text-field>
+           </v-col>
+
+           <v-col cols="12" class="py-1">
+             <v-text-field label="No. Faktur Pajak" v-model="form.taxNumber" variant="outlined" density="compact" hide-details class="small-input bg-white" placeholder="Biarkan kosong agar Auto"></v-text-field>
+           </v-col>
+         </v-row>
+
+         <h6 class="text-subtitle-2 font-weight-bold mb-2 mt-4 text-primary">Info Pengiriman</h6>
+         <v-row dense class="mb-2">
+           <v-col cols="12" class="py-1">
+             <v-text-field type="date" label="Tgl Pengiriman" v-model="form.shipDate" variant="outlined" density="compact" hide-details class="small-input"></v-text-field>
+           </v-col>
+           <v-col cols="12" class="py-1">
+             <v-autocomplete label="Pengiriman" :items="shipmentList" item-title="name" item-value="name" v-model="form.shipmentName" :loading="loadingShipments" variant="outlined" density="compact" hide-details class="small-input" placeholder="Cari/Pilih..." clearable></v-autocomplete>
+           </v-col>
+           <v-col cols="12" class="py-1">
+             <v-autocomplete label="FOB" :items="fobList" item-title="name" item-value="name" v-model="form.fobName" :loading="loadingFobs" variant="outlined" density="compact" hide-details class="small-input" placeholder="Cari/Pilih..." clearable></v-autocomplete>
+           </v-col>
+         </v-row>
+
+         <h6 class="text-subtitle-2 font-weight-bold mb-2 mt-4 text-primary">Info Tambahan (Shipping)</h6>
+         <v-row dense>
+           <v-col cols="6">
+             <v-text-field label="NO. AJU" v-model="form.charField1" variant="outlined" density="compact" hide-details class="mb-2 small-input"></v-text-field>
+           </v-col>
+           <v-col cols="6">
+             <v-text-field label="PARTY" v-model="form.charField2" variant="outlined" density="compact" hide-details class="mb-2 small-input"></v-text-field>
+           </v-col>
+           <v-col cols="6">
+             <v-text-field label="NO CONTAINER" v-model="form.charField3" variant="outlined" density="compact" hide-details class="mb-2 small-input"></v-text-field>
+           </v-col>
+           <v-col cols="6">
+             <v-text-field label="EX KAPAL" v-model="form.charField4" variant="outlined" density="compact" hide-details class="mb-2 small-input"></v-text-field>
+           </v-col>
+           <v-col cols="6">
+             <v-text-field label="ASAL KAPAL" v-model="form.charField5" variant="outlined" density="compact" hide-details class="mb-2 small-input"></v-text-field>
+           </v-col>
+           <v-col cols="6">
+             <v-text-field label="TUJUAN KAPAL" v-model="form.charField6" variant="outlined" density="compact" hide-details class="mb-2 small-input"></v-text-field>
+           </v-col>
+           <v-col cols="6">
+             <v-text-field label="TIBA KAPAL" v-model="form.charField7" variant="outlined" density="compact" hide-details class="mb-2 small-input"></v-text-field>
+           </v-col>
+           <v-col cols="6">
+             <v-text-field label="JENIS DOKUMEN" v-model="form.charField8" variant="outlined" density="compact" hide-details class="mb-2 small-input"></v-text-field>
+           </v-col>
+         </v-row>
         </v-col>
         <v-col cols="12" md="8" class="py-1">
          <h6 class="text-subtitle-2 font-weight-bold mb-2 text-primary">Item Details</h6>
@@ -896,36 +1182,62 @@ onMounted(() => {
      <div class="text-caption font-weight-bold mb-1 d-block text-primary">Item / Service</div>
      <v-autocomplete 
       label="Select Item" 
-      :items="itemList"
+      :items="filteredItems"
       item-title="name" 
       item-value="no"
       v-model="itemDetailForm.itemNo"
+      @update:search="searchItemText = $event"
       @update:model-value="(val) => { onItemChange(val); itemDetailForm.asyncSelectValue = val }"
       :loading="loadingItems"
       density="compact"
       hide-details
       variant="outlined"
       class="small-input"
-      placeholder="Search item..."
-     />
+      placeholder="Ketik untuk mencari item..."
+      no-filter
+     >
+      <template v-slot:item="{ props, item }">
+       <v-list-item v-bind="props" class="py-1">
+        <template v-slot:title>
+         <div class="text-caption font-weight-bold">{{ item.raw.name }}</div>
+        </template>
+        <template v-slot:subtitle>
+         <div class="text-xsmall font-mono text-medium-emphasis mt-1">{{ item.raw.no }}</div>
+        </template>
+       </v-list-item>
+      </template>
+     </v-autocomplete>
     </v-row>
 
     <v-row no-gutters class="mb-3">
      <div class="text-caption font-weight-bold mb-1 d-block text-primary">Project (Optional)</div>
      <v-autocomplete 
       label="Select Project" 
-      :items="projectList"
+      :items="filteredProjects"
       item-title="name" 
       item-value="no"
       v-model="itemDetailForm.projectNo"
+      @update:search="searchProjectText = $event"
       :loading="loadingProjects"
       density="compact"
       hide-details
       clearable
       variant="outlined"
       class="small-input"
-      placeholder="Search project..."
-     />
+      placeholder="Ketik untuk mencari project..."
+      no-filter
+     >
+      <template v-slot:item="{ props, item }">
+       <v-list-item v-bind="props" class="py-1">
+        <template v-slot:title>
+         <div class="text-caption font-weight-bold">{{ item.raw.name }}</div>
+        </template>
+        <template v-slot:subtitle>
+         <div class="text-xsmall font-mono text-medium-emphasis mt-1">{{ item.raw.no }}</div>
+        </template>
+       </v-list-item>
+      </template>
+     </v-autocomplete>
     </v-row>
 
     <v-row no-gutters class="d-flex gap-4">
@@ -1056,6 +1368,22 @@ onMounted(() => {
        </div>
       </v-col>
      </v-row>
+
+     <v-row dense class="mt-2 border-top pt-2" v-if="detailData.infoTambahan && (detailData.infoTambahan.charField1 || detailData.infoTambahan.charField2 || detailData.infoTambahan.charField3 || detailData.infoTambahan.charField4 || detailData.infoTambahan.charField5 || detailData.infoTambahan.charField6 || detailData.infoTambahan.charField7 || detailData.infoTambahan.charField8)">
+       <v-col cols="12">
+         <div class="text-overline text-medium-emphasis mb-1 text-xsmall">Info Tambahan (Shipping)</div>
+         <v-row dense>
+           <v-col cols="6" sm="3" v-if="detailData.infoTambahan.charField1"><div class="text-caption"><span class="font-weight-bold">NO. AJU:</span> {{ detailData.infoTambahan.charField1 }}</div></v-col>
+           <v-col cols="6" sm="3" v-if="detailData.infoTambahan.charField2"><div class="text-caption"><span class="font-weight-bold">PARTY:</span> {{ detailData.infoTambahan.charField2 }}</div></v-col>
+           <v-col cols="6" sm="3" v-if="detailData.infoTambahan.charField3"><div class="text-caption"><span class="font-weight-bold">NO CONT:</span> {{ detailData.infoTambahan.charField3 }}</div></v-col>
+           <v-col cols="6" sm="3" v-if="detailData.infoTambahan.charField4"><div class="text-caption"><span class="font-weight-bold">EX KAPAL:</span> {{ detailData.infoTambahan.charField4 }}</div></v-col>
+           <v-col cols="6" sm="3" v-if="detailData.infoTambahan.charField5"><div class="text-caption"><span class="font-weight-bold">ASAL KAPAL:</span> {{ detailData.infoTambahan.charField5 }}</div></v-col>
+           <v-col cols="6" sm="3" v-if="detailData.infoTambahan.charField6"><div class="text-caption"><span class="font-weight-bold">TUJUAN:</span> {{ detailData.infoTambahan.charField6 }}</div></v-col>
+           <v-col cols="6" sm="3" v-if="detailData.infoTambahan.charField7"><div class="text-caption"><span class="font-weight-bold">TIBA KAPAL:</span> {{ detailData.infoTambahan.charField7 }}</div></v-col>
+           <v-col cols="6" sm="3" v-if="detailData.infoTambahan.charField8"><div class="text-caption"><span class="font-weight-bold">DOKUMEN:</span> {{ detailData.infoTambahan.charField8 }}</div></v-col>
+         </v-row>
+       </v-col>
+     </v-row>
     </div>
 
     <div class="px-4 pb-4">
@@ -1160,15 +1488,24 @@ onMounted(() => {
     <v-btn color="success" variant="flat" size="small" @click="handleApprove(detailData.id)" :loading="approving" class="px-4 text-caption">
      <CheckIcon size="16" class="mr-1"/> Approve & Send
     </v-btn>
+    <v-btn color="info" variant="flat" size="small" @click="downloadPdf(detailData.id)" class="px-4 text-caption text-none">
+     <FileInvoiceIcon size="16" class="mr-1"/> Cetak PDF
+    </v-btn>
    </v-card-actions>
    <v-card-actions v-else-if="detailData.status === 'SUBMITTED'" class="bg-white pa-3 justify-end">
-    <v-btn color="success" variant="flat" size="small" @click="openPaymentModal(detailData)" class="px-4 text-caption">
+    <v-btn color="success" variant="flat" size="small" @click="openPaymentModal(detailData)" class="px-4 text-caption text-none">
      <WalletIcon size="16" class="mr-1"/> Input Payment
     </v-btn>
-    <v-btn variant="outlined" color="primary" size="small" @click="dialogDetail = false" class="px-4 text-caption">Close Detail</v-btn>
+    <v-btn color="info" variant="flat" size="small" @click="downloadPdf(detailData.id)" class="px-4 text-caption text-none">
+     <FileInvoiceIcon size="16" class="mr-1"/> Cetak PDF
+    </v-btn>
+    <v-btn variant="outlined" color="grey-darken-2" size="small" @click="dialogDetail = false" class="px-4 text-caption text-none">Close Detail</v-btn>
    </v-card-actions>
    <v-card-actions v-else class="bg-white pa-3 justify-end">
-    <v-btn variant="outlined" color="primary" size="small" @click="dialogDetail = false" class="px-4 text-caption">Close Detail</v-btn>
+    <v-btn color="info" variant="flat" size="small" @click="downloadPdf(detailData.id)" class="px-4 text-caption text-none">
+     <FileInvoiceIcon size="16" class="mr-1"/> Cetak PDF
+    </v-btn>
+    <v-btn variant="outlined" color="grey-darken-2" size="small" @click="dialogDetail = false" class="px-4 text-caption text-none">Close Detail</v-btn>
    </v-card-actions>
   </v-card>
  </v-dialog>
@@ -1347,11 +1684,20 @@ onMounted(() => {
 
 /* Data table custom styling */
 .compact-data-table :deep(.v-data-table__td) {
- font-size: 0.75rem !important;
+ font-size: 0.7rem !important;
  height: 38px !important; 
 }
 .compact-data-table :deep(.v-data-table-header) th {
  height: 35px !important; 
+ font-size: 0.7rem !important;
+}
+
+/* Wajib 1 baris & bisa scroll horizontal jika tabel kepanjangan */
+.table-nowrap :deep(th),
+.table-nowrap :deep(td),
+.table-nowrap :deep(.text-caption) {
+ white-space: nowrap !important;
+ font-size: 0.7rem !important;
 }
 .compact-data-table :deep(.v-data-table-header) th.text-start {
  text-align: left !important;

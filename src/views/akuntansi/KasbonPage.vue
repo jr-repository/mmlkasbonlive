@@ -41,7 +41,7 @@ const filterDate = reactive({
 
 const dashboardData = ref({
   summary: { cost: 0, bill: 0, gp: 0 },
-  jo_performance: [] as any[]
+  project_performance: [] as any[]
 });
 
 const loadingList = ref(false);
@@ -72,8 +72,8 @@ const form = reactive({
     accountName: '', 
     amount: 0, 
     billAmount: 0, 
-    jobOrderId: null as number | null, 
-    jobOrderNo: '',
+    projectNo: '', 
+    projectName: '',
     notes: '' 
   }]
 });
@@ -85,9 +85,9 @@ const loadingDetail = ref(false);
 const approving = ref(false);
 const rejecting = ref(false);
 
-const dialogJODetail = ref(false);
-const joDetailData = ref<any>(null);
-const loadingJoDetail = ref(false);
+const dialogProjectDetail = ref(false);
+const projectDetailData = ref<any>(null);
+const loadingProjectDetail = ref(false);
 
 const snackbar = reactive({ show: false, text: '', color: 'success' });
 const showMsg = (text: string, color = 'success') => {
@@ -154,7 +154,7 @@ const openCreateModal = () => {
 };
 
 const addItem = () => {
-  form.items.push({ id: Date.now(), accountNo: '', accountName: '', amount: 0, billAmount: 0, jobOrderId: null, jobOrderNo: '', notes: '' });
+  form.items.push({ id: Date.now(), accountNo: '', accountName: '', amount: 0, billAmount: 0, projectNo: '', projectName: '', notes: '' });
 };
 
 const removeItem = (idx: number) => {
@@ -168,10 +168,13 @@ const onItemChange = (idx: number, obj: any) => {
   }
 };
 
-const onJOChange = (idx: number, obj: any) => {
+const onProjectChange = (idx: number, obj: any) => {
   if (obj) {
-    form.items[idx].jobOrderId = obj.id;
-    form.items[idx].jobOrderNo = obj.number;
+    form.items[idx].projectNo = obj.no;
+    form.items[idx].projectName = obj.name;
+  } else {
+    form.items[idx].projectNo = '';
+    form.items[idx].projectName = '';
   }
 };
 
@@ -182,7 +185,7 @@ const resetForm = () => {
   form.bankId = null; 
   form.bankName = '';
   form.description = '';
-  form.items = [{ id: Date.now(), accountNo: '', accountName: '', amount: 0, billAmount: 0, jobOrderId: null, jobOrderNo: '', notes: '' }];
+  form.items = [{ id: Date.now(), accountNo: '', accountName: '', amount: 0, billAmount: 0, projectNo: '', projectName: '', notes: '' }];
 };
 
 const handleEdit = async (item: any) => {
@@ -206,8 +209,8 @@ const handleEdit = async (item: any) => {
         accountName: d.account.name,
         amount: d.amount,
         billAmount: d.billAmount,
-        jobOrderId: d.jobOrder ? d.jobOrder.id : null,
-        jobOrderNo: d.jobOrder ? d.jobOrder.number : '',
+        projectNo: d.project ? d.project.no : '',
+        projectName: d.project ? d.project.name : '',
         notes: d.detailNotes
       }));
       
@@ -241,7 +244,8 @@ const handleSubmit = async () => {
         accountName: d.accountName,
         amount: d.amount,
         billAmount: d.billAmount,
-        jobOrderId: d.jobOrderId,
+        projectNo: d.projectNo,
+        projectName: d.projectName,
         detailNotes: d.notes
       }))
     };
@@ -333,28 +337,28 @@ const openDetail = async (id: number) => {
   }
 };
 
-const openJoDetail = async (joNumber: string) => {
-  dialogJODetail.value = true;
-  loadingJoDetail.value = true;
-  joDetailData.value = null;
+const openProjectDetail = async (projectNo: string) => {
+  dialogProjectDetail.value = true;
+  loadingProjectDetail.value = true;
+  projectDetailData.value = null;
   try {
-    const res = await fetch(`${API_BASE_URL}/Kasbon/GetJoExpenses.php?jo_number=${joNumber}`);
+    const res = await fetch(`${API_BASE_URL}/Kasbon/GetProjectExpenses.php?project_no=${projectNo}`);
     const json = await res.json();
-    if(json.s) joDetailData.value = json.d;
-    else showMsg('Data JO detail tidak ditemukan', 'error');
+    if(json.s) projectDetailData.value = json.d;
+    else showMsg('Data detail proyek tidak ditemukan', 'error');
   } catch {
     showMsg('Error koneksi', 'error');
   } finally {
-    loadingJoDetail.value = false;
+    loadingProjectDetail.value = false;
   }
 };
 
-const printJoPdf = (joNumber: string) => {
-  window.open(`${API_BASE_URL}/Kasbon/ExportJoPdf.php?jo_number=${joNumber}`, '_blank');
+const printProjectPdf = (projectNo: string) => {
+  window.open(`${API_BASE_URL}/Kasbon/ExportProjectPdf.php?project_no=${projectNo}`, '_blank');
 };
 
-const exportJoExcel = (joNumber: string) => {
-  window.open(`${API_BASE_URL}/Kasbon/ExportJoExcel.php?jo_number=${joNumber}`, '_blank');
+const exportProjectExcel = (projectNo: string) => {
+  window.open(`${API_BASE_URL}/Kasbon/ExportProjectExcel.php?project_no=${projectNo}`, '_blank');
 };
 
 onMounted(() => {
@@ -426,7 +430,7 @@ onBeforeUnmount(() => {
             <div class="bg-gradient-smooth px-4 py-3 d-flex align-center justify-space-between flex-wrap gap-2">
               <div class="d-flex align-center">
                 <TrendingUpIcon size="18" class="text-white mr-1" />
-                <h3 class="text-subtitle-1 font-weight-bold text-white">Top 10 Job Order Profitability</h3>
+                <h3 class="text-subtitle-1 font-weight-bold text-white">Top 10 Project Profitability</h3>
               </div>
               
               <div class="d-flex align-center gap-2 flex-wrap">
@@ -446,8 +450,8 @@ onBeforeUnmount(() => {
             <v-table density="compact" class="border rounded-md compact-table">
               <thead>
                 <tr class="bg-grey-lighten-4">
-                  <th class="text-caption">Job Order</th>
-                  <th class="text-caption">Customer</th>
+                  <th class="text-caption">Nomor Proyek</th>
+                  <th class="text-caption">Nama Proyek</th>
                   <th class="text-right text-caption">Total Biaya</th>
                   <th class="text-right text-caption">Total Tagihan</th>
                   <th class="text-right text-caption">Gross Profit</th>
@@ -456,29 +460,29 @@ onBeforeUnmount(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="dashboardData.jo_performance.length === 0">
+                <tr v-if="dashboardData.project_performance.length === 0">
                   <td colspan="7" class="text-center py-2 text-caption text-grey">Belum ada data pada periode ini</td>
                 </tr>
-                <tr v-for="jo in dashboardData.jo_performance" :key="jo.jo_number" class="text-caption hover-row">
-                  <td class="font-weight-bold text-primary">{{ jo.jo_number }}</td>
-                  <td>{{ jo.customer }}</td>
-                  <td class="text-right text-red">Rp {{ Number(jo.cost).toLocaleString('id-ID') }}</td>
-                  <td class="text-right text-blue">Rp {{ Number(jo.bill).toLocaleString('id-ID') }}</td>
-                  <td class="text-right font-weight-bold text-green">Rp {{ Number(jo.gp).toLocaleString('id-ID') }}</td>
+                <tr v-for="proj in dashboardData.project_performance" :key="proj.project_no" class="text-caption hover-row">
+                  <td class="font-weight-bold text-primary">{{ proj.project_no }}</td>
+                  <td>{{ proj.project_name }}</td>
+                  <td class="text-right text-red">Rp {{ Number(proj.cost).toLocaleString('id-ID') }}</td>
+                  <td class="text-right text-blue">Rp {{ Number(proj.bill).toLocaleString('id-ID') }}</td>
+                  <td class="text-right font-weight-bold text-green">Rp {{ Number(proj.gp).toLocaleString('id-ID') }}</td>
                   <td class="text-center">
-                    <v-chip size="x-small" :color="jo.margin > 20 ? 'green' : (jo.margin > 0 ? 'orange' : 'red')" variant="flat" class="text-uppercase font-weight-bold">
-                      {{ jo.margin }}%
+                    <v-chip size="x-small" :color="proj.margin > 20 ? 'green' : (proj.margin > 0 ? 'orange' : 'red')" variant="flat" class="text-uppercase font-weight-bold">
+                      {{ proj.margin }}%
                     </v-chip>
                   </td>
                   <td class="text-center">
                     <div class="d-flex justify-center gap-1">
-                      <v-btn icon variant="text" color="info" size="x-small" @click="openJoDetail(jo.jo_number)" title="View Expense Detail">
+                      <v-btn icon variant="text" color="info" size="x-small" @click="openProjectDetail(proj.project_no)" title="View Expense Detail">
                         <EyeIcon size="16"/>
                       </v-btn>
-                      <v-btn icon variant="text" color="error" size="x-small" @click="printJoPdf(jo.jo_number)" title="Print PDF">
+                      <v-btn icon variant="text" color="error" size="x-small" @click="printProjectPdf(proj.project_no)" title="Print PDF">
                         <PrinterIcon size="16"/>
                       </v-btn>
-                      <v-btn icon variant="text" color="success" size="x-small" @click="exportJoExcel(jo.jo_number)" title="Export Excel">
+                      <v-btn icon variant="text" color="success" size="x-small" @click="exportProjectExcel(proj.project_no)" title="Export Excel">
                         <FileSpreadsheetIcon size="16"/>
                       </v-btn>
                     </div>
@@ -594,7 +598,7 @@ onBeforeUnmount(() => {
                   <th width="30">#</th>
                   <th width="200">Target Account</th>
                   <th>Notes</th>
-                  <th width="150">Job Order (Ref)</th>
+                  <th width="200">Project (Ref)</th>
                   <th width="120" class="text-right">Biaya (Cost)</th>
                   <th width="120" class="text-right">Tagihan (Bill)</th>
                   <th width="30"></th>
@@ -621,12 +625,12 @@ onBeforeUnmount(() => {
                   </td>
                   <td class="pt-1">
                     <AsyncSelect 
-                      :apiEndpoint="`${API_BASE_URL}/JobOrder/List.php`" 
-                      v-model="item.jobOrderNo" 
-                      label="Pilih JO..." 
-                      item-title="number" 
-                      item-value="number" 
-                      @change="(obj: any) => onJOChange(idx, obj)" 
+                      :apiEndpoint="`${API_BASE_URL}/Project/List.php`" 
+                      v-model="item.projectNo" 
+                      label="Pilih Proyek..." 
+                      item-title="name" 
+                      item-value="no" 
+                      @change="(obj: any) => onProjectChange(idx, obj)" 
                                         density="compact"
                                         hide-details
                                         class="small-input-in-table"
@@ -697,12 +701,12 @@ onBeforeUnmount(() => {
             <v-card variant="outlined" class="border rounded-lg overflow-hidden bg-white">
               <v-table density="compact" class="compact-detail-table">
                 <thead class="bg-grey-lighten-4">
-                  <tr class="text-caption"><th>Account</th><th>Notes / JO Ref</th><th class="text-right">Cost</th><th class="text-right">Bill</th></tr>
+                  <tr class="text-caption"><th>Account</th><th>Notes / Project Ref</th><th class="text-right">Cost</th><th class="text-right">Bill</th></tr>
                 </thead>
                 <tbody>
                   <tr v-for="(d, i) in detailData.detailAccount" :key="i" class="text-caption">
                     <td><div class="font-weight-medium text-body-2">{{ d.account?.name }}</div><div class="text-xsmall font-mono text-grey">{{ d.account?.no }}</div></td>
-                    <td><div>{{ d.detailNotes || '-' }}</div><div v-if="d.jobOrder" class="text-xsmall text-primary font-weight-bold">JO: {{ d.jobOrder.number }}</div></td>
+                    <td><div>{{ d.detailNotes || '-' }}</div><div v-if="d.project" class="text-xsmall text-primary font-weight-bold">PRJ: {{ d.project.name }} ({{ d.project.no }})</div></td>
                     <td class="text-right">Rp {{ Number(d.amount).toLocaleString('id-ID') }}</td>
                     <td class="text-right text-blue">Rp {{ Number(d.billAmount).toLocaleString('id-ID') }}</td>
                   </tr>
@@ -723,26 +727,26 @@ onBeforeUnmount(() => {
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="dialogJODetail" max-width="800" scrollable>
+  <v-dialog v-model="dialogProjectDetail" max-width="800" scrollable>
     <v-card class="rounded-lg small-dialog-card">
       <div class="bg-gradient-smooth px-4 py-3 d-flex justify-space-between align-center">
         <div class="d-flex align-center">
           <FileAnalyticsIcon size="20" class="text-white mr-2" />
           <div>
-            <span class="text-subtitle-1 font-weight-bold text-white d-block">Expense History per Job Order</span>
-            <span class="text-caption text-white opacity-80" v-if="joDetailData">{{ joDetailData.jo_info.transaction_number }} - {{ joDetailData.jo_info.customer_name }}</span>
+            <span class="text-subtitle-1 font-weight-bold text-white d-block">Expense History per Project</span>
+            <span class="text-caption text-white opacity-80" v-if="projectDetailData">{{ projectDetailData.project_info.project_no }} - {{ projectDetailData.project_info.project_name }}</span>
           </div>
         </div>
-        <v-btn icon variant="text" color="white" size="small" @click="dialogJODetail = false"><XIcon size="18"/></v-btn>
+        <v-btn icon variant="text" color="white" size="small" @click="dialogProjectDetail = false"><XIcon size="18"/></v-btn>
       </div>
       
       <v-card-text class="pa-0 bg-grey-lighten-5 dialog-detail-content" style="max-height: 70vh;">
-        <div v-if="loadingJoDetail" class="text-center py-6">
+        <div v-if="loadingProjectDetail" class="text-center py-6">
           <v-progress-circular indeterminate color="primary"></v-progress-circular>
           <div class="text-caption mt-2">Loading details...</div>
         </div>
         
-        <div v-else-if="joDetailData">
+        <div v-else-if="projectDetailData">
           <div class="pa-4">
             <v-card variant="outlined" class="mb-4 bg-white">
               <div class="d-flex justify-space-between pa-3 bg-grey-lighten-4 border-bottom">
@@ -751,15 +755,15 @@ onBeforeUnmount(() => {
               <v-row no-gutters class="pa-2">
                 <v-col cols="4" class="text-center border-e px-2">
                   <div class="text-caption text-grey">Total Tagihan (Bill)</div>
-                  <div class="text-subtitle-2 font-weight-bold text-blue">Rp {{ Number(joDetailData.summary.total_bill).toLocaleString('id-ID') }}</div>
+                  <div class="text-subtitle-2 font-weight-bold text-blue">Rp {{ Number(projectDetailData.summary.total_bill).toLocaleString('id-ID') }}</div>
                 </v-col>
                 <v-col cols="4" class="text-center border-e px-2">
                   <div class="text-caption text-grey">Total Biaya (Cost)</div>
-                  <div class="text-subtitle-2 font-weight-bold text-red">Rp {{ Number(joDetailData.summary.total_cost).toLocaleString('id-ID') }}</div>
+                  <div class="text-subtitle-2 font-weight-bold text-red">Rp {{ Number(projectDetailData.summary.total_cost).toLocaleString('id-ID') }}</div>
                 </v-col>
                 <v-col cols="4" class="text-center px-2">
                   <div class="text-caption text-grey">Gross Profit</div>
-                  <div class="text-subtitle-2 font-weight-bold text-green">Rp {{ Number(joDetailData.summary.gross_profit).toLocaleString('id-ID') }}</div>
+                  <div class="text-subtitle-2 font-weight-bold text-green">Rp {{ Number(projectDetailData.summary.gross_profit).toLocaleString('id-ID') }}</div>
                 </v-col>
               </v-row>
             </v-card>
@@ -777,10 +781,10 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-if="joDetailData.expenses.length === 0">
-                    <td colspan="5" class="text-center text-caption text-grey py-4">Tidak ada data pengeluaran untuk JO ini</td>
+                  <tr v-if="projectDetailData.expenses.length === 0">
+                    <td colspan="5" class="text-center text-caption text-grey py-4">Tidak ada data pengeluaran untuk Proyek ini</td>
                   </tr>
-                  <tr v-for="(exp, i) in joDetailData.expenses" :key="i">
+                  <tr v-for="(exp, i) in projectDetailData.expenses" :key="i">
                     <td class="text-center text-caption">{{ format(new Date(exp.trans_date), 'dd/MM/yyyy') }}</td>
                     <td class="text-caption font-weight-medium">{{ exp.transaction_number }}</td>
                     <td class="text-caption text-grey-darken-2">{{ exp.notes || '-' }}</td>
@@ -796,8 +800,8 @@ onBeforeUnmount(() => {
       
       <v-divider></v-divider>
       <v-card-actions class="bg-white pa-3 justify-end">
-        <v-btn variant="outlined" color="primary" size="small" @click="dialogJODetail = false" class="text-caption">Close</v-btn>
-        <v-btn color="error" variant="flat" size="small" @click="printJoPdf(joDetailData?.jo_info.transaction_number)" :disabled="!joDetailData" class="text-caption ml-2">
+        <v-btn variant="outlined" color="primary" size="small" @click="dialogProjectDetail = false" class="text-caption">Close</v-btn>
+        <v-btn color="error" variant="flat" size="small" @click="printProjectPdf(projectDetailData?.project_info.project_no)" :disabled="!projectDetailData" class="text-caption ml-2">
            <PrinterIcon size="16" class="mr-1"/> Print PDF
         </v-btn>
       </v-card-actions>

@@ -1,5 +1,3 @@
-// Lokasi: src/services/auth.service.ts
-
 const API_BASE_URL = "https://multimitralogistik.id/Backend/Api";
 
 export const authService = {
@@ -14,7 +12,8 @@ export const authService = {
             const json = await response.json();
 
             if (json.s) {
-                return { success: true, user: json.d };
+                // Tambahkan pengembalian `token` dari json.token
+                return { success: true, user: json.d, token: json.token };
             } else {
                 return { success: false, message: json.message || "Login gagal" };
             }

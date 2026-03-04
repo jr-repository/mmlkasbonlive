@@ -51,7 +51,7 @@ const fetchList = async () => {
   loadingList.value = true;
   try {
     const url = new URL(`${API_BASE_URL}/Project/List.php`);
-    if (search.value) url.searchParams.append("q", search.value); 
+    // Fitur 'q' dicopot karena pencarian akan di-handle instan oleh client-side
     
     const res = await fetch(url.toString());
     const json = await res.json();
@@ -66,13 +66,6 @@ const fetchList = async () => {
   } 
   finally { loadingList.value = false; }
 };
-
-const fetchListDebounced = () => {
-  if (searchTimeout) clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(fetchList, 600);
-}
-
-watch(search, fetchListDebounced);
 
 const resetForm = () => {
   Object.assign(form, initialFormState);
@@ -145,7 +138,7 @@ const deleteProject = async (id: number) => {
 onMounted(fetchList);
 
 onBeforeUnmount(() => {
-  if (searchTimeout) clearTimeout(searchTimeout);
+  // Cleanup jika perlu
 });
 </script>
 
@@ -342,6 +335,8 @@ onBeforeUnmount(() => {
         <v-data-table 
           :headers="headers" 
           :items="projectList" 
+          :search="search"
+          :items-per-page="10"
           :loading="loadingList" 
           density="compact" 
           hover

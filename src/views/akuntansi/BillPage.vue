@@ -724,7 +724,18 @@ onMounted(() => {
       variant="outlined"
       class="small-input"
       placeholder="Search item..."
-     />
+     >
+      <template v-slot:item="{ props, item }">
+       <v-list-item v-bind="props" class="py-1">
+        <template v-slot:title>
+         <div class="text-caption font-weight-bold">{{ item.raw.name }}</div>
+        </template>
+        <template v-slot:subtitle>
+         <div class="text-xsmall font-mono text-medium-emphasis mt-1">{{ item.raw.no }}</div>
+        </template>
+       </v-list-item>
+      </template>
+     </v-autocomplete>
     </v-row>
 
         <v-row no-gutters class="d-flex gap-4">

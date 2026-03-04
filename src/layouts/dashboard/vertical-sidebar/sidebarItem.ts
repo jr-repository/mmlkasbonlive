@@ -48,11 +48,11 @@ const sidebarItem: menu[] = [
         icon: BriefcaseIcon,
         to: '/proyek'
     },
-    {
-        title: 'Job Order',
-        icon: ClipboardListIcon,
-        to: '/job-order'
-    },
+    // {
+    //     title: 'Job Order',
+    //     icon: ClipboardListIcon,
+    //     to: '/job-order'
+    // },
     {
         title: 'Sales Invoice (AR)', // Piutang Dagang
         icon: FileInvoiceIcon,

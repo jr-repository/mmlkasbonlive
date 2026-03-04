@@ -21,18 +21,24 @@ router.beforeEach(async (to, from, next) => {
   
   // Menggunakan store tanpa anotasi tipe manual yang kaku
   const authStore = useAuthStore();
+  
+  // Cek validitas sesi 1 Hari
+  let isSessionValid = false;
+  if (authStore.user) {
+      isSessionValid = authStore.checkSession();
+  }
 
   // Cek apakah halaman yang dituju membutuhkan autentikasi
   const authRequired = !publicPages.includes(to.path) && to.matched.some((record) => record.meta.requiresAuth);
 
-  // Skenario 1: Butuh Login tapi User belum ada
-  if (authRequired && !authStore.user) {
+  // Skenario 1: Butuh Login tapi User belum ada ATAU sesi 1 harinya sudah expired
+  if (authRequired && (!authStore.user || !isSessionValid)) {
     authStore.returnUrl = to.fullPath;
     return next('/auth/login');
   }
 
-  // Skenario 2: Sudah Login tapi mencoba akses halaman Login
-  if (authStore.user && to.path === '/auth/login') {
+  // Skenario 2: Sudah Login, Sesi Valid, tapi mencoba akses halaman Login
+  if (authStore.user && isSessionValid && to.path === '/auth/login') {
     return next('/'); // Redirect ke Dashboard
   }
 

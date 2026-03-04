@@ -45,7 +45,7 @@ const menuList = [
   { key: 'dashboard', label: 'Dashboard' },
   
   { header: 'Transaksi' },
-  { key: 'job_order', label: 'Job Order' },
+  { key: 'proyek', label: 'Proyek' },
   { key: 'invoice', label: 'Sales Invoice (AR)' },
   { key: 'bill', label: 'Tagihan Vendor (AP)' },
   { key: 'kasbon', label: 'Kasbon & Biaya' },
